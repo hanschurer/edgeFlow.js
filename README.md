@@ -4,9 +4,9 @@
 
 **Lightweight, high-performance browser ML inference framework.**
 
-[![npm version](https://img.shields.io/npm/v/edgeflow.svg)](https://www.npmjs.com/package/edgeflow)
-[![bundle size](https://img.shields.io/bundlephobia/minzip/edgeflow)](https://bundlephobia.com/package/edgeflow)
-[![license](https://img.shields.io/npm/l/edgeflow)](LICENSE)
+[![npm version](https://img.shields.io/npm/v/edgeflowjs.svg)](https://www.npmjs.com/package/edgeflowjs)
+[![bundle size](https://img.shields.io/bundlephobia/minzip/edgeflowjs)](https://bundlephobia.com/package/edgeflowjs)
+[![license](https://img.shields.io/npm/l/edgeflowjs)](LICENSE)
 
 [Documentation](https://edgeflow.js.org) · [Examples](examples/) · [API Reference](https://edgeflow.js.org/api) · [English](README.md) | [中文](README_CN.md)
 

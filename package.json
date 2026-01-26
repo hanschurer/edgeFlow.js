@@ -1,5 +1,5 @@
 {
-  "name": "edgeflow",
+  "name": "edgeflowjs",
   "version": "0.1.0",
   "description": "Lightweight, high-performance browser ML inference framework with native concurrency support",
   "type": "module",
@@ -61,10 +61,10 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/edgeflow/edgeflow.js"
+    "url": "https://github.com/s-zx/edgeflow.js"
   },
   "bugs": {
-    "url": "https://github.com/edgeflow/edgeflow.js/issues"
+    "url": "https://github.com/s-zx/edgeflow.js/issues"
   },
   "homepage": "https://edgeflow.js.org",
   "dependencies": {
