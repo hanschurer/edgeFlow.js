@@ -40,6 +40,35 @@ pnpm add edgeflow
 
 ## 🚀 Quick Start
 
+### Try the Demo
+
+Run the interactive demo locally to test all features:
+
+```bash
+# Clone and install
+git clone https://github.com/user/edgeflow.js.git
+cd edgeflow.js
+npm install
+
+# Build and start demo server
+npm run demo
+```
+
+Open **http://localhost:3000** in your browser:
+
+1. **Load Model** - Enter a Hugging Face ONNX model URL and click "Load Model"
+   ```
+   https://huggingface.co/Xenova/distilbert-base-uncased-finetuned-sst-2-english/resolve/main/onnx/model_quantized.onnx
+   ```
+
+2. **Test Features**:
+   - 🧮 **Tensor Operations** - Test tensor creation, math ops, softmax, relu
+   - 📝 **Text Classification** - Run sentiment analysis on text
+   - 🔍 **Feature Extraction** - Extract embeddings from text
+   - ⚡ **Concurrent Execution** - Test parallel inference
+   - 📋 **Task Scheduler** - Test priority-based task scheduling
+   - 💾 **Memory Management** - Test allocation and cleanup
+
 ### Basic Usage
 
 ```typescript
