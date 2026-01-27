@@ -25,6 +25,9 @@
 - 📥 **模型加载优化** - 支持预加载、分片下载、断点续传
 - 💿 **支持模型缓存** - 基于 IndexedDB 的模型缓存，支持离线使用
 - ⚡ **高性能** - WebGPU 优先，自动降级到 WebNN/WASM
+- 🤗 **HuggingFace Hub** - 一行代码从 HuggingFace 下载模型
+- 🔤 **真实分词器** - BPE 和 WordPiece 分词器，直接加载 tokenizer.json
+- 👷 **Web Worker 支持** - 在后台线程运行推理
 
 ## 📦 安装
 
@@ -137,6 +140,92 @@ const result = await classifier.run(img);
 const results = await classifier.run([img1, img2, img3]);
 ```
 
+### 文本生成（流式输出）
+
+```typescript
+import { pipeline } from 'edgeflow';
+
+const generator = await pipeline('text-generation');
+
+// 简单生成
+const result = await generator.run('从前有座山', {
+  maxNewTokens: 50,
+  temperature: 0.8,
+});
+console.log(result.generatedText);
+
+// 流式输出
+for await (const event of generator.stream('你好，')) {
+  process.stdout.write(event.token);
+  if (event.done) break;
+}
+```
+
+### 零样本分类
+
+```typescript
+import { pipeline } from 'edgeflow';
+
+const classifier = await pipeline('zero-shot-classification');
+
+const result = await classifier.classify(
+  '周末我喜欢踢足球',
+  ['体育', '政治', '科技', '娱乐']
+);
+
+console.log(result.labels[0], result.scores[0]);
+// '体育', 0.92
+```
+
+### 问答系统
+
+```typescript
+import { pipeline } from 'edgeflow';
+
+const qa = await pipeline('question-answering');
+
+const result = await qa.run({
+  question: '法国的首都是什么？',
+  context: '巴黎是法国的首都和最大城市。'
+});
+
+console.log(result.answer); // '巴黎'
+```
+
+### 从 HuggingFace Hub 加载
+
+```typescript
+import { fromHub, fromTask } from 'edgeflow';
+
+// 通过模型 ID 加载（自动下载模型、分词器、配置）
+const bundle = await fromHub('Xenova/distilbert-base-uncased-finetuned-sst-2-english');
+console.log(bundle.tokenizer); // Tokenizer 实例
+console.log(bundle.config);    // 模型配置
+
+// 通过任务名称加载（使用推荐模型）
+const sentimentBundle = await fromTask('sentiment-analysis');
+```
+
+### Web Workers（后台推理）
+
+```typescript
+import { runInWorker, WorkerPool, isWorkerSupported } from 'edgeflow';
+
+// 简单：在后台线程运行推理
+if (isWorkerSupported()) {
+  const outputs = await runInWorker(modelUrl, inputs);
+}
+
+// 高级：使用 Worker 池进行并行处理
+const pool = new WorkerPool({ numWorkers: 4 });
+await pool.init();
+
+const modelId = await pool.loadModel(modelUrl);
+const results = await pool.runBatch(modelId, batchInputs);
+
+pool.terminate();
+```
+
 ## 🎯 支持的任务
 
 | 任务 | 流水线 | 状态 |
@@ -145,9 +234,11 @@ const results = await classifier.run([img1, img2, img3]);
 | 情感分析 | `sentiment-analysis` | ✅ |
 | 特征提取 | `feature-extraction` | ✅ |
 | 图像分类 | `image-classification` | ✅ |
-| 目标检测 | `object-detection` | 🔜 |
-| 文本生成 | `text-generation` | 🔜 |
-| 语音识别 | `automatic-speech-recognition` | 🔜 |
+| 文本生成 | `text-generation` | ✅ |
+| 目标检测 | `object-detection` | ✅ |
+| 语音识别 | `automatic-speech-recognition` | ✅ |
+| 零样本分类 | `zero-shot-classification` | ✅ |
+| 问答系统 | `question-answering` | ✅ |
 
 ## ⚡ 性能
 
@@ -426,20 +517,35 @@ c.dispose();
 - `runInference(model, inputs)` - 运行模型推理
 - `getScheduler()` - 获取全局调度器
 - `getMemoryManager()` - 获取内存管理器
+- `runInWorker(url, inputs)` - 在 Web Worker 中运行推理
+- `WorkerPool` - 管理多个 Worker 进行并行推理
 
 ### 流水线
 
-- `TextClassificationPipeline` - 文本分类流水线
-- `SentimentAnalysisPipeline` - 情感分析流水线
-- `FeatureExtractionPipeline` - 特征提取流水线
-- `ImageClassificationPipeline` - 图像分类流水线
+- `TextClassificationPipeline` - 文本/情感分类
+- `SentimentAnalysisPipeline` - 情感分析
+- `FeatureExtractionPipeline` - 文本嵌入
+- `ImageClassificationPipeline` - 图像分类
+- `TextGenerationPipeline` - 文本生成（支持流式输出）
+- `ObjectDetectionPipeline` - 目标检测（带边界框）
+- `AutomaticSpeechRecognitionPipeline` - 语音转文字
+- `ZeroShotClassificationPipeline` - 零样本分类
+- `QuestionAnsweringPipeline` - 抽取式问答
+
+### HuggingFace Hub
+
+- `fromHub(modelId, options?)` - 从 HuggingFace 加载模型包
+- `fromTask(task, options?)` - 按任务加载推荐模型
+- `downloadTokenizer(modelId)` - 仅下载分词器
+- `downloadConfig(modelId)` - 仅下载配置
+- `POPULAR_MODELS` - 按任务分类的热门模型注册表
 
 ### 工具类
 
-- `Tokenizer` - 文本分词器
-- `ImagePreprocessor` - 图像预处理器
-- `AudioPreprocessor` - 音频预处理器
-- `Cache` - 缓存工具
+- `Tokenizer` - BPE/WordPiece 分词器，支持 HuggingFace 格式
+- `ImagePreprocessor` - 图像预处理器，支持 HuggingFace 配置
+- `AudioPreprocessor` - 音频预处理器，支持 Whisper/wav2vec
+- `Cache` - LRU 缓存工具
 
 ### 工具
 

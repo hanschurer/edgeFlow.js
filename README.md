@@ -25,6 +25,9 @@
 - 📥 **Advanced Model Loading** - Preloading, sharding, resume download support
 - 💿 **Intelligent Caching** - IndexedDB-based model caching for offline use
 - ⚡ **High Performance** - WebGPU-first with automatic fallback to WebNN/WASM
+- 🤗 **HuggingFace Hub** - Direct model download from HuggingFace with one line
+- 🔤 **Real Tokenizers** - BPE & WordPiece tokenizers, load tokenizer.json directly
+- 👷 **Web Worker Support** - Run inference in background threads
 
 ## 📦 Installation
 
@@ -137,6 +140,92 @@ const result = await classifier.run(img);
 const results = await classifier.run([img1, img2, img3]);
 ```
 
+### Text Generation (Streaming)
+
+```typescript
+import { pipeline } from 'edgeflow';
+
+const generator = await pipeline('text-generation');
+
+// Simple generation
+const result = await generator.run('Once upon a time', {
+  maxNewTokens: 50,
+  temperature: 0.8,
+});
+console.log(result.generatedText);
+
+// Streaming output
+for await (const event of generator.stream('Hello, ')) {
+  process.stdout.write(event.token);
+  if (event.done) break;
+}
+```
+
+### Zero-shot Classification
+
+```typescript
+import { pipeline } from 'edgeflow';
+
+const classifier = await pipeline('zero-shot-classification');
+
+const result = await classifier.classify(
+  'I love playing soccer on weekends',
+  ['sports', 'politics', 'technology', 'entertainment']
+);
+
+console.log(result.labels[0], result.scores[0]);
+// 'sports', 0.92
+```
+
+### Question Answering
+
+```typescript
+import { pipeline } from 'edgeflow';
+
+const qa = await pipeline('question-answering');
+
+const result = await qa.run({
+  question: 'What is the capital of France?',
+  context: 'Paris is the capital and largest city of France.'
+});
+
+console.log(result.answer); // 'Paris'
+```
+
+### Load from HuggingFace Hub
+
+```typescript
+import { fromHub, fromTask } from 'edgeflow';
+
+// Load by model ID (auto-downloads model, tokenizer, config)
+const bundle = await fromHub('Xenova/distilbert-base-uncased-finetuned-sst-2-english');
+console.log(bundle.tokenizer); // Tokenizer instance
+console.log(bundle.config);    // Model config
+
+// Load by task name (uses recommended model)
+const sentimentBundle = await fromTask('sentiment-analysis');
+```
+
+### Web Workers (Background Inference)
+
+```typescript
+import { runInWorker, WorkerPool, isWorkerSupported } from 'edgeflow';
+
+// Simple: run inference in background thread
+if (isWorkerSupported()) {
+  const outputs = await runInWorker(modelUrl, inputs);
+}
+
+// Advanced: use worker pool for parallel processing
+const pool = new WorkerPool({ numWorkers: 4 });
+await pool.init();
+
+const modelId = await pool.loadModel(modelUrl);
+const results = await pool.runBatch(modelId, batchInputs);
+
+pool.terminate();
+```
+
 ## 🎯 Supported Tasks
 
 | Task | Pipeline | Status |
@@ -145,9 +234,11 @@ const results = await classifier.run([img1, img2, img3]);
 | Sentiment Analysis | `sentiment-analysis` | ✅ |
 | Feature Extraction | `feature-extraction` | ✅ |
 | Image Classification | `image-classification` | ✅ |
-| Object Detection | `object-detection` | 🔜 |
-| Text Generation | `text-generation` | 🔜 |
-| Speech Recognition | `automatic-speech-recognition` | 🔜 |
+| Text Generation | `text-generation` | ✅ |
+| Object Detection | `object-detection` | ✅ |
+| Speech Recognition | `automatic-speech-recognition` | ✅ |
+| Zero-shot Classification | `zero-shot-classification` | ✅ |
+| Question Answering | `question-answering` | ✅ |
 
 ## ⚡ Performance
 
@@ -426,20 +517,35 @@ c.dispose();
 - `runInference(model, inputs)` - Run model inference
 - `getScheduler()` - Get the global scheduler
 - `getMemoryManager()` - Get the memory manager
+- `runInWorker(url, inputs)` - Run inference in a Web Worker
+- `WorkerPool` - Manage multiple workers for parallel inference
 
 ### Pipelines
 
-- `TextClassificationPipeline`
-- `SentimentAnalysisPipeline`
-- `FeatureExtractionPipeline`
-- `ImageClassificationPipeline`
+- `TextClassificationPipeline` - Text/sentiment classification
+- `SentimentAnalysisPipeline` - Sentiment analysis
+- `FeatureExtractionPipeline` - Text embeddings
+- `ImageClassificationPipeline` - Image classification
+- `TextGenerationPipeline` - Text generation with streaming
+- `ObjectDetectionPipeline` - Object detection with bounding boxes
+- `AutomaticSpeechRecognitionPipeline` - Speech to text
+- `ZeroShotClassificationPipeline` - Classify without training
+- `QuestionAnsweringPipeline` - Extractive QA
+
+### HuggingFace Hub
+
+- `fromHub(modelId, options?)` - Load model bundle from HuggingFace
+- `fromTask(task, options?)` - Load recommended model for task
+- `downloadTokenizer(modelId)` - Download tokenizer only
+- `downloadConfig(modelId)` - Download config only
+- `POPULAR_MODELS` - Registry of popular models by task
 
 ### Utilities
 
-- `Tokenizer` - Text tokenization
-- `ImagePreprocessor` - Image preprocessing
-- `AudioPreprocessor` - Audio preprocessing
-- `Cache` - Caching utilities
+- `Tokenizer` - BPE/WordPiece tokenization with HuggingFace support
+- `ImagePreprocessor` - Image preprocessing with HuggingFace config support
+- `AudioPreprocessor` - Audio preprocessing for Whisper/wav2vec
+- `Cache` - LRU caching utilities
 
 ### Tools
 
