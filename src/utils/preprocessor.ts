@@ -2,9 +2,37 @@
  * edgeFlow.js - Preprocessor
  * 
  * Data preprocessing utilities for images, audio, and other data types.
+ * Supports HuggingFace preprocessor_config.json format.
  */
 
 import { EdgeFlowTensor } from '../core/tensor.js';
+
+// ============================================================================
+// Types
+// ============================================================================
+
+/**
+ * Image input types
+ */
+export type ImageInput = 
+  | HTMLImageElement 
+  | HTMLCanvasElement 
+  | ImageBitmap 
+  | ImageData 
+  | Blob 
+  | File 
+  | string;
+
+/**
+ * Audio input types
+ */
+export type AudioInput = 
+  | AudioBuffer 
+  | Float32Array 
+  | ArrayBuffer 
+  | Blob 
+  | File 
+  | string;
 
 // ============================================================================
 // Image Preprocessing
@@ -14,40 +42,64 @@ import { EdgeFlowTensor } from '../core/tensor.js';
  * Image preprocessing options
  */
 export interface ImagePreprocessorOptions {
-  /** Target width */
+  /** Target width (or size for square) */
   width?: number;
   /** Target height */
   height?: number;
+  /** Single size for square output (sets both width and height) */
+  size?: number;
   /** Resize mode */
-  resizeMode?: 'stretch' | 'contain' | 'cover' | 'pad';
+  resizeMode?: 'stretch' | 'contain' | 'cover' | 'pad' | 'shortest_edge' | 'longest_edge';
   /** Normalization mean */
   mean?: [number, number, number];
   /** Normalization std */
   std?: [number, number, number];
+  /** Rescale factor (applied before normalization) */
+  rescaleFactor?: number;
   /** Convert to grayscale */
   grayscale?: boolean;
   /** Channel format */
   channelFormat?: 'CHW' | 'HWC';
   /** Output data type */
   dtype?: 'float32' | 'uint8';
+  /** Do resize */
+  doResize?: boolean;
+  /** Do rescale */
+  doRescale?: boolean;
+  /** Do normalize */
+  doNormalize?: boolean;
+  /** Do center crop */
+  doCenterCrop?: boolean;
+  /** Center crop size */
+  cropSize?: number | { width: number; height: number };
+  /** Padding color for 'pad' mode (RGB 0-255) */
+  paddingColor?: [number, number, number];
 }
 
 /**
  * Default image preprocessing options (ImageNet style)
  */
-const DEFAULT_IMAGE_OPTIONS: Required<ImagePreprocessorOptions> = {
+const DEFAULT_IMAGE_OPTIONS: ImagePreprocessorOptions = {
   width: 224,
   height: 224,
   resizeMode: 'cover',
   mean: [0.485, 0.456, 0.406],
   std: [0.229, 0.224, 0.225],
+  rescaleFactor: 1 / 255,
   grayscale: false,
   channelFormat: 'CHW',
   dtype: 'float32',
+  doResize: true,
+  doRescale: true,
+  doNormalize: true,
+  doCenterCrop: false,
+  paddingColor: [0, 0, 0],
 };
 
 /**
  * ImagePreprocessor - Process images for model input
+ * 
+ * Supports HuggingFace preprocessor_config.json format.
  */
 export class ImagePreprocessor {
   private readonly options: Required<ImagePreprocessorOptions>;
@@ -55,7 +107,114 @@ export class ImagePreprocessor {
   private ctx: CanvasRenderingContext2D | null = null;
 
   constructor(options: ImagePreprocessorOptions = {}) {
-    this.options = { ...DEFAULT_IMAGE_OPTIONS, ...options };
+    // Handle size option
+    const size = options.size;
+    const width = options.width ?? size ?? DEFAULT_IMAGE_OPTIONS.width!;
+    const height = options.height ?? size ?? DEFAULT_IMAGE_OPTIONS.height!;
+    
+    this.options = {
+      ...DEFAULT_IMAGE_OPTIONS,
+      ...options,
+      width,
+      height,
+      size: size ?? width,
+      cropSize: options.cropSize ?? options.size ?? width,
+    } as Required<ImagePreprocessorOptions>;
+  }
+
+  /**
+   * Load from HuggingFace preprocessor_config.json
+   */
+  static fromConfig(config: Record<string, unknown>): ImagePreprocessor {
+    const options: ImagePreprocessorOptions = {};
+    
+    // Map HuggingFace config to our options
+    const size = config['size'];
+    if (size !== undefined) {
+      if (typeof size === 'number') {
+        options.size = size;
+      } else if (typeof size === 'object' && size !== null) {
+        const sizeObj = size as { width?: number; height?: number; shortest_edge?: number };
+        options.width = sizeObj.width ?? sizeObj.shortest_edge;
+        options.height = sizeObj.height ?? sizeObj.shortest_edge;
+      }
+    }
+    
+    const cropSize = config['crop_size'];
+    if (cropSize !== undefined) {
+      if (typeof cropSize === 'number') {
+        options.cropSize = cropSize;
+      } else if (typeof cropSize === 'object' && cropSize !== null) {
+        const cropObj = cropSize as { width?: number; height?: number };
+        options.cropSize = { width: cropObj.width ?? 224, height: cropObj.height ?? 224 };
+      }
+    }
+    
+    const imageMean = config['image_mean'];
+    if (Array.isArray(imageMean)) {
+      options.mean = imageMean as [number, number, number];
+    }
+    
+    const imageStd = config['image_std'];
+    if (Array.isArray(imageStd)) {
+      options.std = imageStd as [number, number, number];
+    }
+    
+    const rescaleFactor = config['rescale_factor'];
+    if (typeof rescaleFactor === 'number') {
+      options.rescaleFactor = rescaleFactor;
+    }
+    
+    const doResize = config['do_resize'];
+    if (typeof doResize === 'boolean') {
+      options.doResize = doResize;
+    }
+    
+    const doRescale = config['do_rescale'];
+    if (typeof doRescale === 'boolean') {
+      options.doRescale = doRescale;
+    }
+    
+    const doNormalize = config['do_normalize'];
+    if (typeof doNormalize === 'boolean') {
+      options.doNormalize = doNormalize;
+    }
+    
+    const doCenterCrop = config['do_center_crop'];
+    if (typeof doCenterCrop === 'boolean') {
+      options.doCenterCrop = doCenterCrop;
+    }
+    
+    if (config['resample'] !== undefined) {
+      // Map HuggingFace resample to our resize mode
+      options.resizeMode = 'cover';
+    }
+    
+    return new ImagePreprocessor(options);
+  }
+
+  /**
+   * Load from HuggingFace Hub
+   */
+  static async fromUrl(url: string): Promise<ImagePreprocessor> {
+    const response = await fetch(url);
+    if (!response.ok) {
+      throw new Error(`Failed to load preprocessor config from ${url}`);
+    }
+    const config = await response.json() as Record<string, unknown>;
+    return ImagePreprocessor.fromConfig(config);
+  }
+
+  /**
+   * Load from HuggingFace Hub by model ID
+   */
+  static async fromHuggingFace(
+    modelId: string,
+    options?: { revision?: string }
+  ): Promise<ImagePreprocessor> {
+    const revision = options?.revision ?? 'main';
+    const url = `https://huggingface.co/${modelId}/resolve/${revision}/preprocessor_config.json`;
+    return ImagePreprocessor.fromUrl(url);
   }
 
   /**
@@ -75,34 +234,42 @@ export class ImagePreprocessor {
   /**
    * Process an image
    */
-  async process(
-    input: HTMLImageElement | HTMLCanvasElement | ImageBitmap | ImageData | string
-  ): Promise<EdgeFlowTensor> {
+  async process(input: ImageInput): Promise<EdgeFlowTensor> {
     let imageData: ImageData;
 
     if (typeof input === 'string') {
-      // Load from URL
+      // Load from URL or base64
       imageData = await this.loadFromUrl(input);
+    } else if (input instanceof Blob || input instanceof File) {
+      imageData = await this.loadFromBlob(input);
     } else if (input instanceof ImageData) {
       imageData = input;
     } else {
-      // Convert to ImageData
+      // HTMLImageElement, HTMLCanvasElement, ImageBitmap
       imageData = this.toImageData(input);
     }
 
-    // Resize
-    const resized = this.resize(imageData);
+    // Apply preprocessing pipeline
+    let processed = imageData;
 
-    // Convert to tensor
-    return this.toTensor(resized);
+    // 1. Resize
+    if (this.options.doResize) {
+      processed = this.resize(processed);
+    }
+
+    // 2. Center crop
+    if (this.options.doCenterCrop) {
+      processed = this.centerCrop(processed);
+    }
+
+    // 3. Convert to tensor (with rescale and normalize)
+    return this.toTensor(processed);
   }
 
   /**
    * Process multiple images (batch)
    */
-  async processBatch(
-    inputs: Array<HTMLImageElement | HTMLCanvasElement | ImageBitmap | ImageData | string>
-  ): Promise<EdgeFlowTensor> {
+  async processBatch(inputs: ImageInput[]): Promise<EdgeFlowTensor> {
     const tensors = await Promise.all(inputs.map(input => this.process(input)));
     
     // Stack tensors into batch
@@ -133,7 +300,7 @@ export class ImagePreprocessor {
   }
 
   /**
-   * Load image from URL
+   * Load image from URL or base64
    */
   private async loadFromUrl(url: string): Promise<ImageData> {
     return new Promise((resolve, reject) => {
@@ -150,6 +317,54 @@ export class ImagePreprocessor {
       
       img.src = url;
     });
+  }
+
+  /**
+   * Load image from Blob/File
+   */
+  private async loadFromBlob(blob: Blob): Promise<ImageData> {
+    const url = URL.createObjectURL(blob);
+    try {
+      return await this.loadFromUrl(url);
+    } finally {
+      URL.revokeObjectURL(url);
+    }
+  }
+
+  /**
+   * Center crop image
+   */
+  private centerCrop(imageData: ImageData): ImageData {
+    const cropSize = this.options.cropSize;
+    let cropWidth: number;
+    let cropHeight: number;
+    
+    if (typeof cropSize === 'number') {
+      cropWidth = cropSize;
+      cropHeight = cropSize;
+    } else {
+      cropWidth = cropSize.width;
+      cropHeight = cropSize.height;
+    }
+    
+    const srcX = Math.max(0, Math.floor((imageData.width - cropWidth) / 2));
+    const srcY = Math.max(0, Math.floor((imageData.height - cropHeight) / 2));
+    
+    this.ensureCanvas();
+    
+    // Draw source image
+    const srcCanvas = document.createElement('canvas');
+    srcCanvas.width = imageData.width;
+    srcCanvas.height = imageData.height;
+    const srcCtx = srcCanvas.getContext('2d')!;
+    srcCtx.putImageData(imageData, 0, 0);
+    
+    // Crop
+    this.canvas!.width = cropWidth;
+    this.canvas!.height = cropHeight;
+    this.ctx!.drawImage(srcCanvas, srcX, srcY, cropWidth, cropHeight, 0, 0, cropWidth, cropHeight);
+    
+    return this.ctx!.getImageData(0, 0, cropWidth, cropHeight);
   }
 
   /**
@@ -220,7 +435,13 @@ export class ImagePreprocessor {
    * Convert ImageData to tensor
    */
   private toTensor(imageData: ImageData): EdgeFlowTensor {
-    const { width, height, mean, std, grayscale, channelFormat, dtype } = this.options;
+    const { 
+      mean, std, grayscale, channelFormat, dtype,
+      doRescale, rescaleFactor, doNormalize
+    } = this.options;
+    
+    const height = imageData.height;
+    const width = imageData.width;
     const channels = grayscale ? 1 : 3;
     
     const data = new Float32Array(channels * height * width);
@@ -232,29 +453,53 @@ export class ImagePreprocessor {
         
         if (grayscale) {
           // Convert to grayscale
-          const gray = (
+          let gray = (
             0.299 * (pixels[pixelIdx] ?? 0) +
             0.587 * (pixels[pixelIdx + 1] ?? 0) +
             0.114 * (pixels[pixelIdx + 2] ?? 0)
-          ) / 255;
+          );
+          
+          if (doRescale) {
+            gray *= rescaleFactor;
+          }
+          
+          if (doNormalize) {
+            gray = (gray - (mean[0] ?? 0)) / (std[0] ?? 1);
+          }
           
           const idx = y * width + x;
-          data[idx] = (gray - (mean[0] ?? 0)) / (std[0] ?? 1);
+          data[idx] = gray;
         } else if (channelFormat === 'CHW') {
-          // Channel-first format
+          // Channel-first format (used by most PyTorch models)
           for (let c = 0; c < 3; c++) {
-            const value = (pixels[pixelIdx + c] ?? 0) / 255;
-            const normalized = (value - (mean[c] ?? 0)) / (std[c] ?? 1);
+            let value = pixels[pixelIdx + c] ?? 0;
+            
+            if (doRescale) {
+              value *= rescaleFactor;
+            }
+            
+            if (doNormalize) {
+              value = (value - (mean[c] ?? 0)) / (std[c] ?? 1);
+            }
+            
             const idx = c * height * width + y * width + x;
-            data[idx] = normalized;
+            data[idx] = value;
           }
         } else {
-          // HWC format
+          // HWC format (used by TensorFlow models)
           for (let c = 0; c < 3; c++) {
-            const value = (pixels[pixelIdx + c] ?? 0) / 255;
-            const normalized = (value - (mean[c] ?? 0)) / (std[c] ?? 1);
+            let value = pixels[pixelIdx + c] ?? 0;
+            
+            if (doRescale) {
+              value *= rescaleFactor;
+            }
+            
+            if (doNormalize) {
+              value = (value - (mean[c] ?? 0)) / (std[c] ?? 1);
+            }
+            
             const idx = y * width * 3 + x * 3 + c;
-            data[idx] = normalized;
+            data[idx] = value;
           }
         }
       }
@@ -265,6 +510,13 @@ export class ImagePreprocessor {
       : [height, width, channels];
 
     return new EdgeFlowTensor(data, shape, dtype);
+  }
+
+  /**
+   * Get current options
+   */
+  getOptions(): ImagePreprocessorOptions {
+    return { ...this.options };
   }
 }
 
@@ -304,6 +556,8 @@ const DEFAULT_AUDIO_OPTIONS: Required<AudioPreprocessorOptions> = {
 
 /**
  * AudioPreprocessor - Process audio for model input
+ * 
+ * Supports Whisper and other audio model preprocessing.
  */
 export class AudioPreprocessor {
   private readonly options: Required<AudioPreprocessorOptions>;
@@ -311,6 +565,53 @@ export class AudioPreprocessor {
 
   constructor(options: AudioPreprocessorOptions = {}) {
     this.options = { ...DEFAULT_AUDIO_OPTIONS, ...options };
+  }
+
+  /**
+   * Load from HuggingFace feature_extractor config
+   */
+  static fromConfig(config: Record<string, unknown>): AudioPreprocessor {
+    const options: AudioPreprocessorOptions = {};
+    
+    const samplingRate = config['sampling_rate'];
+    if (typeof samplingRate === 'number') {
+      options.sampleRate = samplingRate;
+    }
+    
+    const featureSize = config['feature_size'];
+    if (typeof featureSize === 'number') {
+      options.nMels = featureSize;
+    }
+    
+    const nFft = config['n_fft'];
+    if (typeof nFft === 'number') {
+      options.nFft = nFft;
+    }
+    
+    const hopLength = config['hop_length'];
+    if (typeof hopLength === 'number') {
+      options.hopLength = hopLength;
+    }
+    
+    return new AudioPreprocessor(options);
+  }
+
+  /**
+   * Load from HuggingFace Hub
+   */
+  static async fromHuggingFace(
+    modelId: string,
+    options?: { revision?: string }
+  ): Promise<AudioPreprocessor> {
+    const revision = options?.revision ?? 'main';
+    const url = `https://huggingface.co/${modelId}/resolve/${revision}/preprocessor_config.json`;
+    
+    const response = await fetch(url);
+    if (!response.ok) {
+      throw new Error(`Failed to load audio config from ${url}`);
+    }
+    const config = await response.json() as Record<string, unknown>;
+    return AudioPreprocessor.fromConfig(config);
   }
 
   /**
@@ -329,12 +630,15 @@ export class AudioPreprocessor {
   /**
    * Process audio data
    */
-  async process(input: AudioBuffer | Float32Array | ArrayBuffer | string): Promise<EdgeFlowTensor> {
+  async process(input: AudioInput): Promise<EdgeFlowTensor> {
     let audioData: Float32Array;
 
     if (typeof input === 'string') {
       // Load from URL
       audioData = await this.loadFromUrl(input);
+    } else if (input instanceof Blob || input instanceof File) {
+      // Load from Blob/File
+      audioData = await this.loadFromBlob(input);
     } else if (input instanceof AudioBuffer) {
       audioData = this.audioBufferToFloat32(input);
     } else if (input instanceof Float32Array) {
@@ -365,6 +669,38 @@ export class AudioPreprocessor {
   }
 
   /**
+   * Process raw waveform (for models that don't need mel spectrogram)
+   */
+  async processRaw(input: AudioInput): Promise<EdgeFlowTensor> {
+    let audioData: Float32Array;
+
+    if (typeof input === 'string') {
+      audioData = await this.loadFromUrl(input);
+    } else if (input instanceof Blob || input instanceof File) {
+      audioData = await this.loadFromBlob(input);
+    } else if (input instanceof AudioBuffer) {
+      audioData = this.audioBufferToFloat32(input);
+    } else if (input instanceof Float32Array) {
+      audioData = input;
+    } else {
+      audioData = await this.decodeAudioData(input);
+    }
+
+    // Normalize
+    if (this.options.normalize) {
+      audioData = this.normalizeAudio(audioData);
+    }
+
+    // Truncate/pad
+    const maxSamples = this.options.maxDuration * this.options.sampleRate;
+    if (audioData.length > maxSamples) {
+      audioData = audioData.slice(0, maxSamples);
+    }
+
+    return new EdgeFlowTensor(audioData, [1, audioData.length], 'float32');
+  }
+
+  /**
    * Load audio from URL
    */
   private async loadFromUrl(url: string): Promise<Float32Array> {
@@ -378,11 +714,19 @@ export class AudioPreprocessor {
   }
 
   /**
+   * Load audio from Blob/File
+   */
+  private async loadFromBlob(blob: Blob): Promise<Float32Array> {
+    const arrayBuffer = await blob.arrayBuffer();
+    return this.decodeAudioData(arrayBuffer);
+  }
+
+  /**
    * Decode audio data
    */
   private async decodeAudioData(data: ArrayBuffer): Promise<Float32Array> {
     this.ensureAudioContext();
-    const audioBuffer = await this.audioContext!.decodeAudioData(data);
+    const audioBuffer = await this.audioContext!.decodeAudioData(data.slice(0)); // Clone to avoid detached buffer
     return this.audioBufferToFloat32(audioBuffer);
   }
 

@@ -2,31 +2,61 @@
  * edgeFlow.js - Preprocessor
  *
  * Data preprocessing utilities for images, audio, and other data types.
+ * Supports HuggingFace preprocessor_config.json format.
  */
 import { EdgeFlowTensor } from '../core/tensor.js';
+/**
+ * Image input types
+ */
+export type ImageInput = HTMLImageElement | HTMLCanvasElement | ImageBitmap | ImageData | Blob | File | string;
+/**
+ * Audio input types
+ */
+export type AudioInput = AudioBuffer | Float32Array | ArrayBuffer | Blob | File | string;
 /**
  * Image preprocessing options
  */
 export interface ImagePreprocessorOptions {
-    /** Target width */
+    /** Target width (or size for square) */
     width?: number;
     /** Target height */
     height?: number;
+    /** Single size for square output (sets both width and height) */
+    size?: number;
     /** Resize mode */
-    resizeMode?: 'stretch' | 'contain' | 'cover' | 'pad';
+    resizeMode?: 'stretch' | 'contain' | 'cover' | 'pad' | 'shortest_edge' | 'longest_edge';
     /** Normalization mean */
     mean?: [number, number, number];
     /** Normalization std */
     std?: [number, number, number];
+    /** Rescale factor (applied before normalization) */
+    rescaleFactor?: number;
     /** Convert to grayscale */
     grayscale?: boolean;
     /** Channel format */
     channelFormat?: 'CHW' | 'HWC';
     /** Output data type */
     dtype?: 'float32' | 'uint8';
+    /** Do resize */
+    doResize?: boolean;
+    /** Do rescale */
+    doRescale?: boolean;
+    /** Do normalize */
+    doNormalize?: boolean;
+    /** Do center crop */
+    doCenterCrop?: boolean;
+    /** Center crop size */
+    cropSize?: number | {
+        width: number;
+        height: number;
+    };
+    /** Padding color for 'pad' mode (RGB 0-255) */
+    paddingColor?: [number, number, number];
 }
 /**
  * ImagePreprocessor - Process images for model input
+ *
+ * Supports HuggingFace preprocessor_config.json format.
  */
 export declare class ImagePreprocessor {
     private readonly options;
@@ -34,21 +64,43 @@ export declare class ImagePreprocessor {
     private ctx;
     constructor(options?: ImagePreprocessorOptions);
     /**
+     * Load from HuggingFace preprocessor_config.json
+     */
+    static fromConfig(config: Record<string, unknown>): ImagePreprocessor;
+    /**
+     * Load from HuggingFace Hub
+     */
+    static fromUrl(url: string): Promise<ImagePreprocessor>;
+    /**
+     * Load from HuggingFace Hub by model ID
+     */
+    static fromHuggingFace(modelId: string, options?: {
+        revision?: string;
+    }): Promise<ImagePreprocessor>;
+    /**
      * Initialize canvas (lazy)
      */
     private ensureCanvas;
     /**
      * Process an image
      */
-    process(input: HTMLImageElement | HTMLCanvasElement | ImageBitmap | ImageData | string): Promise<EdgeFlowTensor>;
+    process(input: ImageInput): Promise<EdgeFlowTensor>;
     /**
      * Process multiple images (batch)
      */
-    processBatch(inputs: Array<HTMLImageElement | HTMLCanvasElement | ImageBitmap | ImageData | string>): Promise<EdgeFlowTensor>;
+    processBatch(inputs: ImageInput[]): Promise<EdgeFlowTensor>;
     /**
-     * Load image from URL
+     * Load image from URL or base64
      */
     private loadFromUrl;
+    /**
+     * Load image from Blob/File
+     */
+    private loadFromBlob;
+    /**
+     * Center crop image
+     */
+    private centerCrop;
     /**
      * Convert image element to ImageData
      */
@@ -61,6 +113,10 @@ export declare class ImagePreprocessor {
      * Convert ImageData to tensor
      */
     private toTensor;
+    /**
+     * Get current options
+     */
+    getOptions(): ImagePreprocessorOptions;
 }
 /**
  * Audio preprocessing options
@@ -81,11 +137,23 @@ export interface AudioPreprocessorOptions {
 }
 /**
  * AudioPreprocessor - Process audio for model input
+ *
+ * Supports Whisper and other audio model preprocessing.
  */
 export declare class AudioPreprocessor {
     private readonly options;
     private audioContext;
     constructor(options?: AudioPreprocessorOptions);
+    /**
+     * Load from HuggingFace feature_extractor config
+     */
+    static fromConfig(config: Record<string, unknown>): AudioPreprocessor;
+    /**
+     * Load from HuggingFace Hub
+     */
+    static fromHuggingFace(modelId: string, options?: {
+        revision?: string;
+    }): Promise<AudioPreprocessor>;
     /**
      * Initialize audio context (lazy)
      */
@@ -93,11 +161,19 @@ export declare class AudioPreprocessor {
     /**
      * Process audio data
      */
-    process(input: AudioBuffer | Float32Array | ArrayBuffer | string): Promise<EdgeFlowTensor>;
+    process(input: AudioInput): Promise<EdgeFlowTensor>;
+    /**
+     * Process raw waveform (for models that don't need mel spectrogram)
+     */
+    processRaw(input: AudioInput): Promise<EdgeFlowTensor>;
     /**
      * Load audio from URL
      */
     private loadFromUrl;
+    /**
+     * Load audio from Blob/File
+     */
+    private loadFromBlob;
     /**
      * Decode audio data
      */
