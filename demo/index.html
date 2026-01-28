@@ -4,411 +4,37 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>edgeFlow.js - Interactive Demo</title>
-  <style>
-    :root {
-      --bg-primary: #09090b;
-      --bg-secondary: #18181b;
-      --bg-card: #1c1c22;
-      --bg-card-hover: #27272a;
-      --text-primary: #fafafa;
-      --text-secondary: #a1a1aa;
-      --text-muted: #71717a;
-      --accent: #06b6d4;
-      --accent-dim: #0891b2;
-      --accent-glow: rgba(6, 182, 212, 0.15);
-      --purple: #8b5cf6;
-      --pink: #ec4899;
-      --success: #22c55e;
-      --warning: #f59e0b;
-      --error: #ef4444;
-      --border: #27272a;
-      --border-highlight: #3f3f46;
-    }
-
-    * {
-      margin: 0;
-      padding: 0;
-      box-sizing: border-box;
-    }
-
-    body {
-      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-      background: var(--bg-primary);
-      color: var(--text-primary);
-      min-height: 100vh;
-      line-height: 1.6;
-    }
-
-    .container {
-      max-width: 1400px;
-      margin: 0 auto;
-      padding: 1.5rem;
-    }
-
-    /* Header */
-    header {
-      text-align: center;
-      padding: 3rem 2rem;
-      margin-bottom: 2rem;
-      background: linear-gradient(135deg, var(--bg-secondary) 0%, var(--bg-card) 100%);
-      border-radius: 24px;
-      border: 1px solid var(--border);
-      position: relative;
-      overflow: hidden;
-    }
-
-    header::before {
-      content: '';
-      position: absolute;
-      top: 0;
-      left: 0;
-      right: 0;
-      height: 1px;
-      background: linear-gradient(90deg, transparent, var(--accent), transparent);
-    }
-
-    h1 {
-      font-size: 3rem;
-      font-weight: 800;
-      background: linear-gradient(135deg, var(--accent) 0%, var(--purple) 50%, var(--pink) 100%);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      margin-bottom: 0.5rem;
-      letter-spacing: -0.02em;
-    }
-
-    .subtitle {
-      color: var(--text-secondary);
-      font-size: 1.125rem;
-      font-weight: 400;
-    }
-
-    /* Bento Grid */
-    .bento-grid {
-      display: grid;
-      grid-template-columns: repeat(12, 1fr);
-      gap: 1rem;
-      margin-bottom: 1rem;
-    }
-
-    .bento-card {
-      background: var(--bg-card);
-      border: 1px solid var(--border);
-      border-radius: 16px;
-      padding: 1.25rem;
-      transition: all 0.3s ease;
-      position: relative;
-      overflow: hidden;
-    }
-
-    .bento-card:hover {
-      border-color: var(--border-highlight);
-      transform: translateY(-2px);
-      box-shadow: 0 20px 40px -12px rgba(0, 0, 0, 0.4);
-    }
-
-    .bento-card::before {
-      content: '';
-      position: absolute;
-      top: 0;
-      left: 0;
-      right: 0;
-      height: 2px;
-      background: linear-gradient(90deg, var(--accent), var(--purple));
-      opacity: 0;
-      transition: opacity 0.3s;
-    }
-
-    .bento-card:hover::before {
-      opacity: 1;
-    }
-
-    /* Card Sizes */
-    .span-3 { grid-column: span 3; }
-    .span-4 { grid-column: span 4; }
-    .span-5 { grid-column: span 5; }
-    .span-6 { grid-column: span 6; }
-    .span-7 { grid-column: span 7; }
-    .span-8 { grid-column: span 8; }
-    .span-12 { grid-column: span 12; }
-
-    /* Card Header */
-    .card-header {
-      display: flex;
-      align-items: center;
-      gap: 0.75rem;
-      margin-bottom: 1rem;
-    }
-
-    .card-icon {
-      width: 36px;
-      height: 36px;
-      border-radius: 10px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 1.125rem;
-      background: linear-gradient(135deg, var(--accent) 0%, var(--purple) 100%);
-      flex-shrink: 0;
-    }
-
-    .card-icon.pink { background: linear-gradient(135deg, var(--pink) 0%, var(--purple) 100%); }
-    .card-icon.green { background: linear-gradient(135deg, var(--success) 0%, var(--accent) 100%); }
-    .card-icon.orange { background: linear-gradient(135deg, var(--warning) 0%, var(--pink) 100%); }
-
-    .card-title {
-      font-size: 1rem;
-      font-weight: 600;
-      color: var(--text-primary);
-    }
-
-    .card-desc {
-      font-size: 0.8125rem;
-      color: var(--text-muted);
-    }
-
-    /* Status List */
-    .status-list {
-      display: flex;
-      flex-direction: column;
-      gap: 0.5rem;
-    }
-
-    .status-item {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding: 0.5rem 0.75rem;
-      background: var(--bg-secondary);
-      border-radius: 8px;
-      font-size: 0.8125rem;
-    }
-
-    .status-badge {
-      padding: 0.25rem 0.625rem;
-      border-radius: 6px;
-      font-size: 0.6875rem;
-      font-weight: 600;
-      text-transform: uppercase;
-      letter-spacing: 0.02em;
-    }
-
-    .status-success { background: rgba(34, 197, 94, 0.15); color: var(--success); }
-    .status-warning { background: rgba(245, 158, 11, 0.15); color: var(--warning); }
-    .status-error { background: rgba(239, 68, 68, 0.15); color: var(--error); }
-    .status-pending { background: rgba(161, 161, 170, 0.15); color: var(--text-secondary); }
-
-    /* Buttons */
-    button {
-      background: linear-gradient(135deg, var(--accent) 0%, var(--accent-dim) 100%);
-      color: white;
-      border: none;
-      padding: 0.5rem 1rem;
-      border-radius: 8px;
-      font-family: inherit;
-      font-size: 0.8125rem;
-      font-weight: 600;
-      cursor: pointer;
-      transition: all 0.2s;
-    }
-
-    button:hover {
-      opacity: 0.9;
-      transform: translateY(-1px);
-    }
-
-    button:disabled {
-      opacity: 0.5;
-      cursor: not-allowed;
-      transform: none;
-    }
-
-    .btn-secondary {
-      background: var(--bg-secondary);
-      border: 1px solid var(--border);
-    }
-
-    .btn-sm {
-      padding: 0.375rem 0.75rem;
-      font-size: 0.75rem;
-    }
-
-    .btn-group {
-      display: flex;
-      gap: 0.5rem;
-      flex-wrap: wrap;
-    }
-
-    /* Inputs */
-    input, textarea {
-      width: 100%;
-      padding: 0.625rem 0.875rem;
-      background: var(--bg-secondary);
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      color: var(--text-primary);
-      font-family: inherit;
-      font-size: 0.8125rem;
-      transition: border-color 0.2s;
-    }
-
-    input:focus, textarea:focus {
-      outline: none;
-      border-color: var(--accent);
-    }
-
-    textarea {
-      min-height: 80px;
-      resize: vertical;
-    }
-
-    /* Output */
-    .output {
-      background: var(--bg-primary);
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      padding: 0.875rem;
-      font-family: 'JetBrains Mono', 'Fira Code', monospace;
-      font-size: 0.75rem;
-      overflow-x: auto;
-      max-height: 200px;
-      overflow-y: auto;
-      line-height: 1.5;
-    }
-
-    .output pre {
-      white-space: pre-wrap;
-      word-break: break-word;
-      margin: 0;
-    }
-
-    .output .success { color: var(--success); }
-    .output .error { color: var(--error); }
-    .output .info { color: var(--accent); }
-    .output .warn { color: var(--warning); }
-
-    /* Metrics */
-    .metrics {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(80px, 1fr));
-      gap: 0.75rem;
-    }
-
-    .metric {
-      text-align: center;
-      padding: 0.75rem;
-      background: var(--bg-secondary);
-      border-radius: 8px;
-    }
-
-    .metric-value {
-      font-size: 1.25rem;
-      font-weight: 700;
-      color: var(--accent);
-      font-variant-numeric: tabular-nums;
-    }
-
-    .metric-label {
-      font-size: 0.6875rem;
-      color: var(--text-muted);
-      margin-top: 0.25rem;
-      text-transform: uppercase;
-      letter-spacing: 0.02em;
-    }
-
-    /* Loader */
-    .loader {
-      display: inline-block;
-      width: 14px;
-      height: 14px;
-      border: 2px solid var(--border);
-      border-top-color: var(--accent);
-      border-radius: 50%;
-      animation: spin 0.8s linear infinite;
-      vertical-align: middle;
-      margin-right: 0.5rem;
-    }
-
-    @keyframes spin {
-      to { transform: rotate(360deg); }
-    }
-
-    /* Dashboard Frame */
-    .dashboard-frame {
-      width: 100%;
-      height: 400px;
-      border: none;
-      border-radius: 8px;
-      background: var(--bg-secondary);
-    }
-
-    /* Spacing utilities */
-    .mt-1 { margin-top: 0.5rem; }
-    .mt-2 { margin-top: 0.75rem; }
-    .mt-3 { margin-top: 1rem; }
-    .mb-1 { margin-bottom: 0.5rem; }
-    .mb-2 { margin-bottom: 0.75rem; }
-
-    /* Footer */
-    footer {
-      text-align: center;
-      padding: 2rem;
-      color: var(--text-muted);
-      font-size: 0.8125rem;
-    }
-
-    footer a {
-      color: var(--accent);
-      text-decoration: none;
-    }
-
-    /* Responsive */
-    @media (max-width: 1024px) {
-      .span-3, .span-4, .span-5 { grid-column: span 6; }
-      .span-7, .span-8 { grid-column: span 12; }
-    }
-
-    @media (max-width: 768px) {
-      .container { padding: 1rem; }
-      h1 { font-size: 2rem; }
-      .bento-grid { grid-template-columns: 1fr; }
-      .span-3, .span-4, .span-5, .span-6, .span-7, .span-8, .span-12 { grid-column: span 1; }
-    }
-  </style>
+  <link rel="stylesheet" href="/demo/styles.css">
 </head>
 <body>
   <div class="container">
+    <!-- Header -->
     <header>
-      <h1>⚡ edgeFlow.js</h1>
+      <h1><span>⚡ edgeFlow.js</span></h1>
       <p class="subtitle">Lightweight Browser ML Inference Framework</p>
     </header>
 
-    <!-- Row 1: Runtime + Memory + Model Loading -->
+    <!-- Row 1: Status Cards + Model Loading -->
     <div class="bento-grid">
+      <!-- Runtime Status -->
       <div class="bento-card span-3">
         <div class="card-header">
           <div class="card-icon">🖥️</div>
-          <div><div class="card-title">Runtime</div></div>
+          <div class="card-title">Runtime</div>
         </div>
-        <div class="status-list" id="runtime-status">
-          <div class="status-item"><span>WebGPU</span><span class="status-badge status-pending" id="webgpu-status">...</span></div>
-          <div class="status-item"><span>WebNN</span><span class="status-badge status-pending" id="webnn-status">...</span></div>
-          <div class="status-item"><span>WASM</span><span class="status-badge status-pending" id="wasm-status">...</span></div>
-        </div>
+        <div class="status-list" id="runtime-status"></div>
       </div>
 
+      <!-- Memory Status -->
       <div class="bento-card span-3">
         <div class="card-header">
           <div class="card-icon green">📊</div>
-          <div><div class="card-title">Memory</div></div>
+          <div class="card-title">Memory</div>
         </div>
-        <div class="status-list">
-          <div class="status-item"><span>Allocated</span><span id="mem-allocated">0 B</span></div>
-          <div class="status-item"><span>Peak</span><span id="mem-peak">0 B</span></div>
-          <div class="status-item"><span>Tensors</span><span id="mem-tensors">0</span></div>
-        </div>
+        <div class="status-list" id="memory-status"></div>
       </div>
 
+      <!-- Model Loading -->
       <div class="bento-card span-6">
         <div class="card-header">
           <div class="card-icon pink">📦</div>
@@ -420,15 +46,16 @@
         <input type="text" id="model-url" placeholder="Enter ONNX model URL..." class="mb-2"
                value="https://huggingface.co/Xenova/distilbert-base-uncased-finetuned-sst-2-english/resolve/main/onnx/model_quantized.onnx">
         <div class="btn-group">
-          <button onclick="loadRealModel()">Load Model</button>
-          <button class="btn-secondary" onclick="testLoadedModel()">Test Inference</button>
+          <button onclick="Demo.loadModel()">Load Model</button>
+          <button class="btn-secondary" onclick="Demo.testModel()">Test Inference</button>
         </div>
-        <div class="output mt-2" id="model-output"><pre><span class="info">Click "Load Model" to download an ONNX model</span></pre></div>
+        <div class="output mt-2" id="model-output"></div>
       </div>
     </div>
 
-    <!-- Row 2: Tensor Ops + Text Classification -->
+    <!-- Row 2: Core Operations -->
     <div class="bento-grid">
+      <!-- Tensor Operations -->
       <div class="bento-card span-4">
         <div class="card-header">
           <div class="card-icon">🧮</div>
@@ -437,10 +64,11 @@
             <div class="card-desc">Create, manipulate, and compute tensors</div>
           </div>
         </div>
-        <button onclick="runTensorTests()">Run Tests</button>
-        <div class="output mt-2" id="tensor-output"><pre>Click "Run Tests" to test tensor operations...</pre></div>
+        <button onclick="Demo.testTensors()">Run Tests</button>
+        <div class="output mt-2" id="tensor-output"></div>
       </div>
 
+      <!-- Text Classification -->
       <div class="bento-card span-4">
         <div class="card-header">
           <div class="card-icon pink">📝</div>
@@ -451,12 +79,13 @@
         </div>
         <input type="text" id="text-input" placeholder="Enter text..." value="I love this product!" class="mb-2">
         <div class="btn-group">
-          <button onclick="runTextClassification()">Classify</button>
-          <button class="btn-secondary" onclick="runBatchClassification()">Batch</button>
+          <button onclick="Demo.classifyText()">Classify</button>
+          <button class="btn-secondary" onclick="Demo.classifyBatch()">Batch</button>
         </div>
-        <div class="output mt-2" id="text-output"><pre>Load model first, then classify text...</pre></div>
+        <div class="output mt-2" id="text-output"></div>
       </div>
 
+      <!-- Feature Extraction -->
       <div class="bento-card span-4">
         <div class="card-header">
           <div class="card-icon green">🔍</div>
@@ -466,13 +95,14 @@
           </div>
         </div>
         <textarea id="feature-input" class="mb-2" placeholder="Enter text...">Machine learning is transforming software.</textarea>
-        <button onclick="runFeatureExtraction()">Extract</button>
-        <div class="output mt-2" id="feature-output"><pre>Enter text and extract features...</pre></div>
+        <button onclick="Demo.extractFeatures()">Extract</button>
+        <div class="output mt-2" id="feature-output"></div>
       </div>
     </div>
 
-    <!-- Row 3: Quantization + Debugger + Benchmark -->
+    <!-- Row 3: Tools -->
     <div class="bento-grid">
+      <!-- Quantization -->
       <div class="bento-card span-4">
         <div class="card-header">
           <div class="card-icon orange">📦</div>
@@ -482,12 +112,13 @@
           </div>
         </div>
         <div class="btn-group mb-2">
-          <button onclick="runQuantizationDemo()">Quantize Demo</button>
-          <button class="btn-secondary" onclick="runPruningDemo()">Prune Demo</button>
+          <button onclick="Demo.quantize()">Quantize</button>
+          <button class="btn-secondary" onclick="Demo.prune()">Prune</button>
         </div>
-        <div class="output" id="quant-output"><pre>Test in-browser quantization...</pre></div>
+        <div class="output" id="quant-output"></div>
       </div>
 
+      <!-- Debugger -->
       <div class="bento-card span-4">
         <div class="card-header">
           <div class="card-icon">🔬</div>
@@ -496,10 +127,11 @@
             <div class="card-desc">Inspect tensor statistics & distribution</div>
           </div>
         </div>
-        <button onclick="runDebuggerDemo()">Inspect Tensor</button>
-        <div class="output mt-2" id="debugger-output"><pre>Inspect tensor values and statistics...</pre></div>
+        <button onclick="Demo.debug()">Inspect Tensor</button>
+        <div class="output mt-2" id="debugger-output"></div>
       </div>
 
+      <!-- Benchmark -->
       <div class="bento-card span-4">
         <div class="card-header">
           <div class="card-icon pink">⚡</div>
@@ -508,13 +140,14 @@
             <div class="card-desc">Measure operation performance</div>
           </div>
         </div>
-        <button onclick="runBenchmarkDemo()">Run Benchmark</button>
-        <div class="output mt-2" id="benchmark-output"><pre>Benchmark tensor operations...</pre></div>
+        <button onclick="Demo.benchmark()">Run Benchmark</button>
+        <div class="output mt-2" id="benchmark-output"></div>
       </div>
     </div>
 
-    <!-- Row 4: Scheduler + Memory Mgmt + Concurrency -->
+    <!-- Row 4: System -->
     <div class="bento-grid">
+      <!-- Scheduler -->
       <div class="bento-card span-4">
         <div class="card-header">
           <div class="card-icon green">📋</div>
@@ -523,10 +156,11 @@
             <div class="card-desc">Priority-based task scheduling</div>
           </div>
         </div>
-        <button onclick="runSchedulerTest()">Test Scheduler</button>
-        <div class="output mt-2" id="scheduler-output"><pre>Test task scheduling with priorities...</pre></div>
+        <button onclick="Demo.testScheduler()">Test Scheduler</button>
+        <div class="output mt-2" id="scheduler-output"></div>
       </div>
 
+      <!-- Memory Management -->
       <div class="bento-card span-4">
         <div class="card-header">
           <div class="card-icon orange">💾</div>
@@ -536,12 +170,13 @@
           </div>
         </div>
         <div class="btn-group">
-          <button onclick="runMemoryTest()">Allocate</button>
-          <button class="btn-secondary" onclick="runMemoryCleanup()">Cleanup</button>
+          <button onclick="Demo.allocateMemory()">Allocate</button>
+          <button class="btn-secondary" onclick="Demo.cleanupMemory()">Cleanup</button>
         </div>
-        <div class="output mt-2" id="memory-output"><pre>Test memory allocation and cleanup...</pre></div>
+        <div class="output mt-2" id="memory-output"></div>
       </div>
 
+      <!-- Concurrency -->
       <div class="bento-card span-4">
         <div class="card-header">
           <div class="card-icon">⚡</div>
@@ -550,432 +185,50 @@
             <div class="card-desc">Run multiple inferences in parallel</div>
           </div>
         </div>
-        <button onclick="runConcurrencyTest()">Run Test</button>
-        <div class="output mt-2" id="concurrency-output"><pre>Test concurrent inference...</pre></div>
-        <div class="metrics mt-2" id="concurrency-metrics" style="display: none;">
-          <div class="metric"><div class="metric-value" id="metric-total">-</div><div class="metric-label">Total</div></div>
-          <div class="metric"><div class="metric-value" id="metric-tasks">-</div><div class="metric-label">Tasks</div></div>
-          <div class="metric"><div class="metric-value" id="metric-avg">-</div><div class="metric-label">Avg</div></div>
-        </div>
+        <button onclick="Demo.testConcurrency()">Run Test</button>
+        <div class="output mt-2" id="concurrency-output"></div>
+        <div class="metrics mt-2 hidden" id="concurrency-metrics"></div>
       </div>
     </div>
 
-    <!-- Row 5: Performance Monitor Dashboard -->
+    <!-- Row 5: Monitor -->
     <div class="bento-grid">
       <div class="bento-card span-12">
         <div class="card-header">
           <div class="card-icon pink">📊</div>
           <div>
-            <div class="card-title">Performance Monitor Dashboard</div>
+            <div class="card-title">Performance Monitor</div>
             <div class="card-desc">Real-time performance metrics and visualization</div>
           </div>
         </div>
         <div class="btn-group mb-2">
-          <button onclick="startMonitor()">Start Monitor</button>
-          <button class="btn-secondary" onclick="recordInferences()">Simulate Inferences</button>
-          <button class="btn-secondary" onclick="showDashboard()">Open Dashboard</button>
-          <button class="btn-secondary" onclick="stopMonitor()">Stop</button>
+          <button onclick="Demo.startMonitor()">Start</button>
+          <button class="btn-secondary" onclick="Demo.simulateInferences()">Simulate</button>
+          <button class="btn-secondary" onclick="Demo.openDashboard()">Dashboard</button>
+          <button class="btn-secondary" onclick="Demo.stopMonitor()">Stop</button>
         </div>
-        <div class="metrics mb-2" id="monitor-metrics">
-          <div class="metric"><div class="metric-value" id="mon-count">0</div><div class="metric-label">Inferences</div></div>
-          <div class="metric"><div class="metric-value" id="mon-avg">0ms</div><div class="metric-label">Avg Time</div></div>
-          <div class="metric"><div class="metric-value" id="mon-throughput">0</div><div class="metric-label">Ops/sec</div></div>
-          <div class="metric"><div class="metric-value" id="mon-memory">0 B</div><div class="metric-label">Memory</div></div>
-          <div class="metric"><div class="metric-value" id="mon-fps">-</div><div class="metric-label">FPS</div></div>
-        </div>
-        <iframe id="dashboard-frame" class="dashboard-frame" style="display: none;"></iframe>
+        <div class="metrics" id="monitor-metrics"></div>
       </div>
     </div>
 
+    <!-- Footer -->
     <footer>
       <p>edgeFlow.js v0.1.0 | <a href="https://github.com/nicepkg/edgeflow.js" target="_blank">GitHub</a></p>
     </footer>
   </div>
 
-  <script type="module">
-    import * as edgeFlow from '../dist/edgeflow.browser.js';
-    window.edgeFlow = edgeFlow;
+  <!-- Dashboard Modal -->
+  <div class="modal-overlay" id="dashboard-modal">
+    <div class="modal">
+      <div class="modal-header">
+        <span class="modal-title">📊 Performance Dashboard</span>
+        <button class="modal-close" onclick="Demo.closeDashboard()">×</button>
+      </div>
+      <iframe id="dashboard-frame" class="modal-frame"></iframe>
+    </div>
+  </div>
 
-    let loadedModel = null;
-    let testTensors = [];
-    let monitor = null;
-
-    // Initialize
-    window.addEventListener('DOMContentLoaded', async () => {
-      await checkRuntimes();
-      refreshMemoryStats();
-    });
-
-    // Check runtimes
-    async function checkRuntimes() {
-      try {
-        const runtimes = await edgeFlow.getAvailableRuntimes();
-        updateStatus('webgpu-status', runtimes.get('webgpu'));
-        updateStatus('webnn-status', runtimes.get('webnn'));
-        updateStatus('wasm-status', runtimes.get('wasm'));
-      } catch (e) {
-        ['webgpu', 'webnn', 'wasm'].forEach(r => updateStatus(r + '-status', false));
-      }
-    }
-
-    function updateStatus(id, available) {
-      const el = document.getElementById(id);
-      el.textContent = available ? 'Ready' : 'N/A';
-      el.className = 'status-badge ' + (available ? 'status-success' : 'status-error');
-    }
-
-    window.refreshMemoryStats = function() {
-      try {
-        const stats = edgeFlow.getMemoryStats();
-        document.getElementById('mem-allocated').textContent = formatBytes(stats.allocated || 0);
-        document.getElementById('mem-peak').textContent = formatBytes(stats.peak || 0);
-        document.getElementById('mem-tensors').textContent = stats.tensorCount || 0;
-      } catch (e) {}
-    };
-
-    function formatBytes(bytes) {
-      if (!bytes) return '0 B';
-      const k = 1024, sizes = ['B', 'KB', 'MB', 'GB'];
-      const i = Math.floor(Math.log(bytes) / Math.log(k));
-      return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
-    }
-
-    // Model Loading
-    window.loadRealModel = async function() {
-      const output = document.getElementById('model-output');
-      const url = document.getElementById('model-url').value;
-      if (!url) { output.innerHTML = '<pre class="warn">Enter a model URL</pre>'; return; }
-      output.innerHTML = '<pre><span class="loader"></span>Loading model...</pre>';
-      try {
-        const start = performance.now();
-        loadedModel = await edgeFlow.loadModel(url, { runtime: 'wasm' });
-        const time = ((performance.now() - start) / 1000).toFixed(2);
-        output.innerHTML = `<pre><span class="success">✓ Model loaded in ${time}s</span>
-Name: ${loadedModel.metadata.name}
-Size: ${formatBytes(loadedModel.metadata.sizeBytes)}
-Inputs: ${loadedModel.metadata.inputs.map(i => i.name).join(', ')}</pre>`;
-        refreshMemoryStats();
-      } catch (e) {
-        output.innerHTML = `<pre><span class="error">Error: ${e.message}</span></pre>`;
-      }
-    };
-
-    window.testLoadedModel = async function() {
-      const output = document.getElementById('model-output');
-      if (!loadedModel) { output.innerHTML = '<pre class="warn">Load model first</pre>'; return; }
-      output.innerHTML = '<pre><span class="loader"></span>Running inference...</pre>';
-      try {
-        const inputs = createModelInputs(loadedModel, 128);
-        const start = performance.now();
-        const outputs = await edgeFlow.runInference(loadedModel, inputs);
-        const time = (performance.now() - start).toFixed(2);
-        const data = outputs[0].toArray();
-        output.innerHTML = `<pre><span class="success">✓ Inference: ${time}ms</span>
-Output: [${data.slice(0, 5).map(x => x.toFixed(4)).join(', ')}...]</pre>`;
-        inputs.forEach(t => t.dispose());
-        outputs.forEach(t => t.dispose());
-      } catch (e) {
-        output.innerHTML = `<pre><span class="error">Error: ${e.message}</span></pre>`;
-      }
-    };
-
-    function createModelInputs(model, seqLen) {
-      return model.metadata.inputs.map(spec => {
-        let data = new Array(seqLen).fill(0);
-        if (spec.name.includes('input')) { data[0] = 101; data[1] = 2054; data[2] = 102; }
-        else if (spec.name.includes('mask')) { data[0] = 1; data[1] = 1; data[2] = 1; }
-        return edgeFlow.tensor(data, [1, seqLen], 'int64');
-      });
-    }
-
-    // Tensor Tests
-    window.runTensorTests = function() {
-      const output = document.getElementById('tensor-output');
-      try {
-        const a = edgeFlow.tensor([[1, 2], [3, 4]]);
-        const b = edgeFlow.tensor([[5, 6], [7, 8]]);
-        const sum = edgeFlow.add(a, b);
-        const rand = edgeFlow.random([10]);
-        const probs = edgeFlow.softmax(edgeFlow.tensor([1, 2, 3, 4]));
-        output.innerHTML = `<pre><span class="success">✓ All tensor tests passed</span>
-• Created 2x2 tensor
-• Addition: [${sum.toArray()}]
-• Random: [${rand.toArray().slice(0,5).map(x=>x.toFixed(2))}...]
-• Softmax: [${probs.toArray().map(x=>x.toFixed(3))}]</pre>`;
-        [a, b, sum, rand, probs].forEach(t => t.dispose());
-      } catch (e) {
-        output.innerHTML = `<pre><span class="error">Error: ${e.message}</span></pre>`;
-      }
-      refreshMemoryStats();
-    };
-
-    // Text Classification
-    window.runTextClassification = async function() {
-      const output = document.getElementById('text-output');
-      if (!loadedModel) { output.innerHTML = '<pre class="warn">Load model first</pre>'; return; }
-      const text = document.getElementById('text-input').value;
-      if (!text) return;
-      output.innerHTML = '<pre><span class="loader"></span>Classifying...</pre>';
-      try {
-        const result = await runInferenceOnText(text);
-        output.innerHTML = `<pre><span class="success">${result.label === 'positive' ? '😊' : '😞'} ${result.label.toUpperCase()}</span> (${(result.score * 100).toFixed(1)}%)</pre>`;
-      } catch (e) {
-        output.innerHTML = `<pre><span class="error">Error: ${e.message}</span></pre>`;
-      }
-    };
-
-    window.runBatchClassification = async function() {
-      const output = document.getElementById('text-output');
-      if (!loadedModel) { output.innerHTML = '<pre class="warn">Load model first</pre>'; return; }
-      const texts = ['I love this!', 'This is terrible.', 'Amazing!', 'Worst ever.', 'Pretty good.'];
-      output.innerHTML = '<pre><span class="loader"></span>Processing batch...</pre>';
-      try {
-        const start = performance.now();
-        const results = await Promise.all(texts.map(t => runInferenceOnText(t)));
-        const time = (performance.now() - start).toFixed(0);
-        output.innerHTML = '<pre>' + results.map((r, i) => 
-          `${r.label === 'positive' ? '😊' : '😞'} "${texts[i]}" → ${r.label}`
-        ).join('\n') + `\n\n<span class="success">Total: ${time}ms</span></pre>`;
-      } catch (e) {
-        output.innerHTML = `<pre><span class="error">Error: ${e.message}</span></pre>`;
-      }
-    };
-
-    async function runInferenceOnText(text) {
-      const tokens = text.toLowerCase().split(/\s+/);
-      const maxLen = 128, numTokens = Math.min(tokens.length + 2, maxLen);
-      const inputs = loadedModel.metadata.inputs.map(spec => {
-        let data = new Array(maxLen).fill(0);
-        if (spec.name.includes('input')) {
-          data[0] = 101;
-          tokens.slice(0, maxLen - 2).forEach((t, i) => {
-            data[i + 1] = Math.abs(t.split('').reduce((a, c) => a + c.charCodeAt(0), 0)) % 30000;
-          });
-          data[numTokens - 1] = 102;
-        } else if (spec.name.includes('mask')) {
-          for (let i = 0; i < numTokens; i++) data[i] = 1;
-        }
-        return edgeFlow.tensor(data, [1, maxLen], 'int64');
-      });
-      const outputs = await edgeFlow.runInference(loadedModel, inputs);
-      const outputData = outputs[0].toArray();
-      const score = outputData.length >= 2 
-        ? Math.exp(outputData[1]) / (Math.exp(outputData[0]) + Math.exp(outputData[1]))
-        : outputData[0] > 0.5 ? outputData[0] : 1 - outputData[0];
-      inputs.forEach(t => t.dispose());
-      outputs.forEach(t => t.dispose());
-      return { label: score > 0.5 ? 'positive' : 'negative', score };
-    }
-
-    // Feature Extraction
-    window.runFeatureExtraction = async function() {
-      const output = document.getElementById('feature-output');
-      if (!loadedModel) { output.innerHTML = '<pre class="warn">Load model first</pre>'; return; }
-      const text = document.getElementById('feature-input').value;
-      if (!text) return;
-      output.innerHTML = '<pre><span class="loader"></span>Extracting...</pre>';
-      try {
-        const inputs = createModelInputs(loadedModel, 128);
-        const start = performance.now();
-        const outputs = await edgeFlow.runInference(loadedModel, inputs);
-        const time = (performance.now() - start).toFixed(2);
-        const embeddings = outputs[0].toArray();
-        const norm = Math.sqrt(embeddings.reduce((a, b) => a + b * b, 0));
-        output.innerHTML = `<pre><span class="success">✓ Features extracted in ${time}ms</span>
-Dimension: ${embeddings.length}
-L2 Norm: ${norm.toFixed(4)}
-Sample: [${embeddings.slice(0, 5).map(x => x.toFixed(4)).join(', ')}...]</pre>`;
-        inputs.forEach(t => t.dispose());
-        outputs.forEach(t => t.dispose());
-      } catch (e) {
-        output.innerHTML = `<pre><span class="error">Error: ${e.message}</span></pre>`;
-      }
-    };
-
-    // Quantization Demo
-    window.runQuantizationDemo = function() {
-      const output = document.getElementById('quant-output');
-      try {
-        const weights = edgeFlow.tensor([0.5, -0.3, 0.8, -0.1, 0.9, -0.7, 0.2, -0.4], [2, 4], 'float32');
-        const { tensor: quantized, scale, zeroPoint } = edgeFlow.quantizeTensor(weights, 'int8');
-        const dequantized = edgeFlow.dequantizeTensor(quantized, scale, zeroPoint, 'int8');
-        const original = weights.toArray();
-        const recovered = dequantized.toArray();
-        const maxError = Math.max(...original.map((v, i) => Math.abs(v - recovered[i])));
-        output.innerHTML = `<pre><span class="success">✓ Int8 Quantization</span>
-Original:    [${original.map(v => v.toFixed(3)).join(', ')}]
-Quantized:   [${quantized.toArray().join(', ')}]
-Dequantized: [${recovered.map(v => v.toFixed(3)).join(', ')}]
-Scale: ${scale.toFixed(6)}, Max Error: ${maxError.toFixed(6)}</pre>`;
-        [weights, quantized, dequantized].forEach(t => t.dispose());
-      } catch (e) {
-        output.innerHTML = `<pre><span class="error">Error: ${e.message}</span></pre>`;
-      }
-    };
-
-    window.runPruningDemo = function() {
-      const output = document.getElementById('quant-output');
-      try {
-        const weights = edgeFlow.tensor([0.5, -0.1, 0.8, -0.05, 0.9, -0.02, 0.2, -0.4], [2, 4], 'float32');
-        const { tensor: pruned, sparsity } = edgeFlow.pruneTensor(weights, { ratio: 0.5 });
-        output.innerHTML = `<pre><span class="success">✓ Magnitude Pruning (50%)</span>
-Original: [${weights.toArray().map(v => v.toFixed(2)).join(', ')}]
-Pruned:   [${pruned.toArray().map(v => v.toFixed(2)).join(', ')}]
-Sparsity: ${(sparsity * 100).toFixed(1)}%</pre>`;
-        [weights, pruned].forEach(t => t.dispose());
-      } catch (e) {
-        output.innerHTML = `<pre><span class="error">Error: ${e.message}</span></pre>`;
-      }
-    };
-
-    // Debugger Demo
-    window.runDebuggerDemo = function() {
-      const output = document.getElementById('debugger-output');
-      try {
-        const data = Array.from({ length: 100 }, () => Math.random() * 2 - 1);
-        const tensor = edgeFlow.tensor(data, [10, 10], 'float32');
-        const inspection = edgeFlow.inspectTensor(tensor, 'random_weights');
-        const histogram = edgeFlow.createAsciiHistogram(inspection.histogram, 25, 4);
-        output.innerHTML = `<pre><span class="success">Tensor: ${inspection.name}</span>
-Shape: [${inspection.shape}], Size: ${inspection.size}
-<span class="info">Statistics:</span>
-  Min: ${inspection.stats.min.toFixed(4)}
-  Max: ${inspection.stats.max.toFixed(4)}
-  Mean: ${inspection.stats.mean.toFixed(4)}
-  Std: ${inspection.stats.std.toFixed(4)}
-
-${histogram}</pre>`;
-        tensor.dispose();
-      } catch (e) {
-        output.innerHTML = `<pre><span class="error">Error: ${e.message}</span></pre>`;
-      }
-    };
-
-    // Benchmark Demo
-    window.runBenchmarkDemo = async function() {
-      const output = document.getElementById('benchmark-output');
-      output.innerHTML = '<pre><span class="loader"></span>Running benchmark...</pre>';
-      try {
-        const result = await edgeFlow.runBenchmark(async () => {
-          const t = edgeFlow.tensor(Array.from({ length: 1000 }, () => Math.random()), [1000], 'float32');
-          const sum = t.toArray().reduce((a, b) => a + b, 0);
-          t.dispose();
-          return sum;
-        }, { warmupRuns: 2, runs: 5, name: 'Tensor Sum (1000)' });
-        output.innerHTML = `<pre><span class="success">Benchmark: ${result.name}</span>
-Avg: ${result.avgTime.toFixed(2)}ms
-Min: ${result.minTime.toFixed(2)}ms
-Max: ${result.maxTime.toFixed(2)}ms
-Throughput: ${result.throughput.toFixed(0)} ops/sec</pre>`;
-      } catch (e) {
-        output.innerHTML = `<pre><span class="error">Error: ${e.message}</span></pre>`;
-      }
-    };
-
-    // Scheduler Test
-    window.runSchedulerTest = async function() {
-      const output = document.getElementById('scheduler-output');
-      output.innerHTML = '<pre><span class="loader"></span>Testing scheduler...</pre>';
-      try {
-        const scheduler = edgeFlow.getScheduler();
-        const task1 = scheduler.schedule('model-a', async () => { await sleep(100); return 'Task 1'; }, 'high');
-        const task2 = scheduler.schedule('model-b', async () => { await sleep(50); return 'Task 2'; }, 'normal');
-        const task3 = scheduler.schedule('model-a', async () => { await sleep(75); return 'Task 3'; }, 'low');
-        const [r1, r2, r3] = await Promise.all([task1.wait(), task2.wait(), task3.wait()]);
-        output.innerHTML = `<pre><span class="success">✓ Scheduler Test Passed</span>
-• ${r1} (high priority)
-• ${r2} (normal priority)
-• ${r3} (low priority)</pre>`;
-      } catch (e) {
-        output.innerHTML = `<pre><span class="error">Error: ${e.message}</span></pre>`;
-      }
-    };
-
-    // Memory Test
-    window.runMemoryTest = function() {
-      const output = document.getElementById('memory-output');
-      try {
-        const before = edgeFlow.getMemoryStats();
-        for (let i = 0; i < 10; i++) testTensors.push(edgeFlow.random([100, 100]));
-        const after = edgeFlow.getMemoryStats();
-        output.innerHTML = `<pre><span class="success">✓ Allocated 10 tensors (100x100)</span>
-Before: ${formatBytes(before.allocated || 0)}, ${before.tensorCount || 0} tensors
-After: ${formatBytes(after.allocated || 0)}, ${after.tensorCount || 0} tensors</pre>`;
-        refreshMemoryStats();
-      } catch (e) {
-        output.innerHTML = `<pre><span class="error">Error: ${e.message}</span></pre>`;
-      }
-    };
-
-    window.runMemoryCleanup = function() {
-      const output = document.getElementById('memory-output');
-      testTensors.forEach(t => { if (!t.isDisposed) t.dispose(); });
-      testTensors = [];
-      edgeFlow.gc();
-      output.innerHTML = `<pre><span class="success">✓ Memory cleaned up</span></pre>`;
-      refreshMemoryStats();
-    };
-
-    // Concurrency Test
-    window.runConcurrencyTest = async function() {
-      const output = document.getElementById('concurrency-output');
-      const metrics = document.getElementById('concurrency-metrics');
-      if (!loadedModel) { output.innerHTML = '<pre class="warn">Load model first</pre>'; metrics.style.display = 'none'; return; }
-      output.innerHTML = '<pre><span class="loader"></span>Running concurrent tasks...</pre>';
-      try {
-        const texts = ['Great!', 'Terrible!', 'Amazing!', 'Awful!', 'Good!', 'Bad!', 'Nice!', 'Horrible!'];
-        const start = performance.now();
-        const results = await Promise.all(texts.map(t => runInferenceOnText(t)));
-        const total = performance.now() - start;
-        output.innerHTML = '<pre><span class="success">✓ Concurrent execution complete</span>\n' +
-          results.map((r, i) => `${r.label === 'positive' ? '😊' : '😞'} "${texts[i]}"`).join('\n') + '</pre>';
-        document.getElementById('metric-total').textContent = total.toFixed(0) + 'ms';
-        document.getElementById('metric-tasks').textContent = texts.length;
-        document.getElementById('metric-avg').textContent = (total / texts.length).toFixed(0) + 'ms';
-        metrics.style.display = 'grid';
-      } catch (e) {
-        output.innerHTML = `<pre><span class="error">Error: ${e.message}</span></pre>`;
-      }
-    };
-
-    // Performance Monitor
-    window.startMonitor = function() {
-      if (!monitor) {
-        monitor = new edgeFlow.PerformanceMonitor({ sampleInterval: 500, historySize: 30 });
-        monitor.onSample(updateMonitorMetrics);
-      }
-      monitor.start();
-    };
-
-    window.stopMonitor = function() {
-      if (monitor) monitor.stop();
-    };
-
-    window.recordInferences = function() {
-      if (!monitor) startMonitor();
-      for (let i = 0; i < 5; i++) {
-        setTimeout(() => monitor.recordInference(30 + Math.random() * 70), i * 100);
-      }
-    };
-
-    function updateMonitorMetrics(sample) {
-      document.getElementById('mon-count').textContent = sample.inference.count;
-      document.getElementById('mon-avg').textContent = sample.inference.avgTime.toFixed(1) + 'ms';
-      document.getElementById('mon-throughput').textContent = sample.inference.throughput.toFixed(1);
-      document.getElementById('mon-memory').textContent = formatBytes(sample.memory.usedHeap);
-      document.getElementById('mon-fps').textContent = sample.system.fps || '-';
-    }
-
-    window.showDashboard = function() {
-      if (!monitor) { startMonitor(); recordInferences(); }
-      const frame = document.getElementById('dashboard-frame');
-      frame.style.display = frame.style.display === 'none' ? 'block' : 'none';
-      if (frame.style.display === 'block') {
-        frame.srcdoc = edgeFlow.generateDashboardHTML(monitor);
-      }
-    };
-
-    function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
-  </script>
+  <!-- Demo Script -->
+  <script type="module" src="/demo/demo.js"></script>
 </body>
 </html>
