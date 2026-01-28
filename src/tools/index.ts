@@ -492,6 +492,89 @@ export type {
 } from './benchmark.js';
 
 // ============================================================================
+// Re-export advanced quantization tools
+// ============================================================================
+
+export {
+  quantizeModel,
+  quantizeTensor,
+  dequantizeTensor,
+  pruneModel,
+  pruneTensor,
+  analyzeModel as analyzeModelDetailed,
+  exportModel as exportModelAdvanced,
+  dequantizeInt8,
+  dequantizeUint8,
+  dequantizeFloat16,
+  float16ToFloat32,
+} from './quantization.js';
+
+export type {
+  QuantizationType as QuantizationMethod,
+  QuantizationOptions as AdvancedQuantizationOptions,
+  QuantizationProgress,
+  QuantizationResult as AdvancedQuantizationResult,
+  LayerQuantizationStats,
+  QuantizationStats,
+  PruningOptions as AdvancedPruningOptions,
+  PruningResult as AdvancedPruningResult,
+  ModelAnalysis as DetailedModelAnalysis,
+  ExportFormat,
+  ExportOptions,
+} from './quantization.js';
+
+// ============================================================================
+// Re-export debugging tools
+// ============================================================================
+
+export {
+  EdgeFlowDebugger,
+  getDebugger,
+  enableDebugging,
+  disableDebugging,
+  inspectTensor,
+  formatTensorInspection,
+  createAsciiHistogram,
+  createTensorHeatmap,
+  visualizeModelArchitecture,
+} from './debugger.js';
+
+export type {
+  DebuggerConfig,
+  TensorInspection,
+  TensorStats,
+  HistogramData,
+  InferenceTrace,
+  OperationTrace,
+  DebugEvent,
+  PerformanceMetrics as DebugPerformanceMetrics,
+} from './debugger.js';
+
+// ============================================================================
+// Re-export monitoring tools
+// ============================================================================
+
+export {
+  PerformanceMonitor,
+  getMonitor,
+  startMonitoring,
+  stopMonitoring,
+  generateDashboardHTML,
+  generateAsciiDashboard,
+} from './monitor.js';
+
+export type {
+  MonitorConfig,
+  PerformanceSample,
+  InferenceMetrics,
+  MemoryMetrics,
+  SystemMetrics,
+  AlertConfig,
+  AlertEvent,
+  WidgetData,
+} from './monitor.js';
+
+// ============================================================================
 // Export Utilities
 // ============================================================================
 
