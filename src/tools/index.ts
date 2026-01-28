@@ -472,6 +472,26 @@ export async function benchmark(
 }
 
 // ============================================================================
+// Re-export benchmark utilities
+// ============================================================================
+
+export {
+  benchmark as runBenchmark,
+  compareBenchmarks,
+  benchmarkSuite,
+  benchmarkMemory,
+  formatBenchmarkResult,
+  formatComparisonResult,
+} from './benchmark.js';
+
+export type {
+  BenchmarkOptions as DetailedBenchmarkOptions,
+  BenchmarkResult as DetailedBenchmarkResult,
+  CompareBenchmarkResult,
+  MemoryBenchmarkResult,
+} from './benchmark.js';
+
+// ============================================================================
 // Export Utilities
 // ============================================================================
 

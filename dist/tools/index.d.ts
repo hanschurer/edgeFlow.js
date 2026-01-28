@@ -136,6 +136,8 @@ export interface BenchmarkResult {
  * Benchmark model inference
  */
 export declare function benchmark(runFn: () => Promise<void>, options?: BenchmarkOptions): Promise<BenchmarkResult>;
+export { benchmark as runBenchmark, compareBenchmarks, benchmarkSuite, benchmarkMemory, formatBenchmarkResult, formatComparisonResult, } from './benchmark.js';
+export type { BenchmarkOptions as DetailedBenchmarkOptions, BenchmarkResult as DetailedBenchmarkResult, CompareBenchmarkResult, MemoryBenchmarkResult, } from './benchmark.js';
 /**
  * Export model to different formats
  */
