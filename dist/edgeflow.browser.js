@@ -3328,6 +3328,9 @@ var ONNXRuntime = class {
   async initialize() {
     if (this.initialized)
       return;
+    if (typeof window !== "undefined") {
+      ort.env.wasm.wasmPaths = "https://cdn.jsdelivr.net/npm/onnxruntime-web@1.17.0/dist/";
+    }
     this.executionProvider = "wasm";
     this.initialized = true;
   }

@@ -10,7 +10,7 @@
  * 6. Initialization
  */
 
-import * as edgeFlow from '../dist/edgeflow.browser.js';
+import * as edgeFlow from '/dist/edgeflow.browser.js';
 
 // Expose edgeFlow globally for debugging
 window.edgeFlow = edgeFlow;

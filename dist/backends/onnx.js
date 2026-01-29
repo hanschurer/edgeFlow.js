@@ -41,6 +41,10 @@ export class ONNXRuntime {
     async initialize() {
         if (this.initialized)
             return;
+        // Configure WASM paths for CDN loading (required for browser deployment)
+        if (typeof window !== 'undefined') {
+            ort.env.wasm.wasmPaths = 'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.17.0/dist/';
+        }
         // Use WASM execution provider (most compatible)
         this.executionProvider = 'wasm';
         this.initialized = true;
