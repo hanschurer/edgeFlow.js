@@ -94,6 +94,22 @@ export class Tokenizer {
             tokenizer.unkToken = data.model.unk_token ?? '[UNK]';
             tokenizer.continuingSubwordPrefix = data.model.continuing_subword_prefix ?? '##';
         }
+        // Infer special token IDs from vocab if not provided via added_tokens.
+        // Many HuggingFace tokenizer.json files keep [CLS]/[SEP]/[PAD]/[UNK]/[MASK]
+        // in the base vocab, not in added_tokens.
+        const inferFromVocab = (tok) => tokenizer.vocab.get(tok);
+        // pad/unk are always initialized to 0, but if vocab defines them, prefer vocab ids.
+        const padFromVocab = inferFromVocab('[PAD]');
+        if (padFromVocab !== undefined)
+            tokenizer.padTokenId = padFromVocab;
+        const unkFromVocab = inferFromVocab('[UNK]');
+        if (unkFromVocab !== undefined)
+            tokenizer.unkTokenId = unkFromVocab;
+        tokenizer.clsTokenId ??= inferFromVocab('[CLS]');
+        tokenizer.sepTokenId ??= inferFromVocab('[SEP]');
+        tokenizer.maskTokenId ??= inferFromVocab('[MASK]');
+        tokenizer.bosTokenId ??= inferFromVocab('<s>');
+        tokenizer.eosTokenId ??= inferFromVocab('</s>');
         // Load added tokens
         if (data.added_tokens) {
             for (const token of data.added_tokens) {
@@ -173,7 +189,16 @@ export class Tokenizer {
      * Pre-tokenize text (split into words)
      */
     preTokenize(text) {
-        // GPT-2 style: split on whitespace and punctuation, keeping them
+        // NOTE: Different tokenizer models expect different pre-tokenization behavior.
+        // - WordPiece (BERT): whitespace-separated words, punctuation kept separate.
+        // - BPE (GPT-2): byte-level merges benefit from keeping leading spaces.
+        if (this.modelType === 'WordPiece') {
+            // Split into: words/numbers OR punctuation, dropping whitespace.
+            const pattern = /\p{L}+|\p{N}+|[^\s\p{L}\p{N}]+/gu;
+            const matches = text.match(pattern);
+            return matches ?? [text];
+        }
+        // GPT-2 style: split on whitespace and punctuation, keeping them (incl. optional leading space).
         const pattern = /'s|'t|'re|'ve|'m|'ll|'d| ?\p{L}+| ?\p{N}+| ?[^\s\p{L}\p{N}]+|\s+(?!\S)|\s+/gu;
         const matches = text.match(pattern);
         return matches ?? [text];
@@ -297,6 +322,11 @@ export class Tokenizer {
      * Tokenize a single word
      */
     tokenizeWord(word) {
+        // WordPiece vocab never includes leading whitespace; strip it to avoid
+        // producing [UNK] + per-character fallbacks for normal words like " Obama".
+        if (this.modelType === 'WordPiece') {
+            word = word.trimStart();
+        }
         // Check added tokens first
         if (this.addedTokens.has(word)) {
             return [word];

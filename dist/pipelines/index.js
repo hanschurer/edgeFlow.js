@@ -11,6 +11,8 @@ export { FeatureExtractionPipeline, createFeatureExtractionPipeline, } from './f
 export { ImageClassificationPipeline, createImageClassificationPipeline, } from './image-classification.js';
 // Text Generation
 export { TextGenerationPipeline, createTextGenerationPipeline, } from './text-generation.js';
+// Token Classification (NER)
+export { TokenClassificationPipeline, } from './token-classification.js';
 // Object Detection
 export { ObjectDetectionPipeline, createObjectDetectionPipeline, COCO_LABELS, } from './object-detection.js';
 // Automatic Speech Recognition
@@ -21,6 +23,7 @@ export { ZeroShotClassificationPipeline, createZeroShotClassificationPipeline, }
 export { QuestionAnsweringPipeline, createQuestionAnsweringPipeline, } from './question-answering.js';
 // Import pipeline classes
 import { TextClassificationPipeline, SentimentAnalysisPipeline } from './text-classification.js';
+import { TokenClassificationPipeline } from './token-classification.js';
 import { FeatureExtractionPipeline } from './feature-extraction.js';
 import { ImageClassificationPipeline } from './image-classification.js';
 import { TextGenerationPipeline } from './text-generation.js';
@@ -55,6 +58,9 @@ export async function pipeline(task, options) {
     switch (task) {
         case 'text-classification':
             pipelineInstance = new TextClassificationPipeline(config, options?.labels);
+            break;
+        case 'token-classification':
+            pipelineInstance = new TokenClassificationPipeline(config);
             break;
         case 'sentiment-analysis':
             pipelineInstance = new SentimentAnalysisPipeline(config);

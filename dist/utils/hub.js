@@ -118,7 +118,23 @@ export async function downloadJson(modelId, filename, options = {}) {
  */
 export async function downloadTokenizer(modelId, options = {}) {
     const url = buildFileUrl(modelId, 'tokenizer.json', options);
-    return Tokenizer.fromUrl(url);
+    // Use the same cached/resumable loader as models to avoid duplicate downloads
+    // across pipelines and sessions.
+    const data = await loadModelData(url, {
+        cache: options.cache ?? true,
+        forceDownload: options.forceDownload ?? false,
+        onProgress: options.onProgress ? (progress) => {
+            options.onProgress({
+                file: 'tokenizer.json',
+                fileIndex: 1,
+                totalFiles: 1,
+                fileProgress: progress,
+                overallProgress: progress.percent,
+            });
+        } : undefined,
+    });
+    const text = new TextDecoder().decode(data);
+    return Tokenizer.fromJSON(text);
 }
 /**
  * Download model config from HuggingFace Hub

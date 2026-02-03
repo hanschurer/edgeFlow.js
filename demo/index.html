@@ -108,6 +108,25 @@
       </div>
     </div>
 
+    <!-- Row 2.25: NER -->
+    <div class="bento-grid">
+      <div class="bento-card span-12">
+        <div class="card-header">
+          <div class="card-icon green">🏷️</div>
+          <div>
+            <div class="card-title">Named Entity Recognition (NER)</div>
+            <div class="card-desc">Token classification pipeline (span-based entities)</div>
+          </div>
+        </div>
+        <textarea id="ner-input" class="mb-2" placeholder="Enter text...">Barack Obama visited Beijing and met researchers at OpenAI Labs.</textarea>
+        <div class="btn-group">
+          <button onclick="Demo.loadNERModel()">Load NER Model</button>
+          <button onclick="Demo.runNER()">Run NER</button>
+        </div>
+        <div class="output mt-2" id="ner-output"></div>
+      </div>
+    </div>
+
     <!-- Row 3: Tools -->
     <div class="bento-grid">
       <!-- Quantization -->

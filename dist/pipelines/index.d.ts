@@ -2,11 +2,12 @@
  * edgeFlow.js - Pipeline Exports
  */
 import { RuntimeType, QuantizationType } from '../core/types.js';
-export { BasePipeline, registerPipeline, getPipelineFactory, SENTIMENT_LABELS, EMOTION_LABELS, IMAGENET_LABELS, type PipelineResult, type TextClassificationResult, type FeatureExtractionResult, type ImageClassificationResult, type ObjectDetectionResult, } from './base.js';
+export { BasePipeline, registerPipeline, getPipelineFactory, SENTIMENT_LABELS, EMOTION_LABELS, IMAGENET_LABELS, type PipelineResult, type TextClassificationResult, type TokenClassificationResult, type FeatureExtractionResult, type ImageClassificationResult, type ObjectDetectionResult, } from './base.js';
 export { TextClassificationPipeline, SentimentAnalysisPipeline, createTextClassificationPipeline, createSentimentAnalysisPipeline, type TextClassificationOptions, } from './text-classification.js';
 export { FeatureExtractionPipeline, createFeatureExtractionPipeline, type FeatureExtractionOptions, } from './feature-extraction.js';
 export { ImageClassificationPipeline, createImageClassificationPipeline, type ImageClassificationOptions, type ImageInput, } from './image-classification.js';
 export { TextGenerationPipeline, createTextGenerationPipeline, type TextGenerationOptions, type TextGenerationResult, type GenerationStreamEvent, } from './text-generation.js';
+export { TokenClassificationPipeline, type TokenClassificationOptions, type NerEntity, type NerEntityType, } from './token-classification.js';
 export { ObjectDetectionPipeline, createObjectDetectionPipeline, COCO_LABELS, type ObjectDetectionOptions, type Detection, type BoundingBox, } from './object-detection.js';
 export { AutomaticSpeechRecognitionPipeline, createASRPipeline, type ASROptions, type ASRResult, type WordTimestamp, type ChunkTimestamp, } from './automatic-speech-recognition.js';
 export { ZeroShotClassificationPipeline, createZeroShotClassificationPipeline, type ZeroShotClassificationOptions, type ZeroShotClassificationResult, } from './zero-shot-classification.js';
@@ -31,6 +32,7 @@ export interface PipelineFactoryOptions {
  */
 type PipelineTaskMap = {
     'text-classification': TextClassificationPipeline;
+    'token-classification': TokenClassificationPipeline;
     'sentiment-analysis': SentimentAnalysisPipeline;
     'feature-extraction': FeatureExtractionPipeline;
     'image-classification': ImageClassificationPipeline;
@@ -41,6 +43,7 @@ type PipelineTaskMap = {
     'question-answering': QuestionAnsweringPipeline;
 };
 import { TextClassificationPipeline, SentimentAnalysisPipeline } from './text-classification.js';
+import { TokenClassificationPipeline } from './token-classification.js';
 import { FeatureExtractionPipeline } from './feature-extraction.js';
 import { ImageClassificationPipeline } from './image-classification.js';
 import { TextGenerationPipeline } from './text-generation.js';

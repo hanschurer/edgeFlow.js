@@ -21,6 +21,7 @@ window.edgeFlow = edgeFlow;
 
 const state = {
   model: null,
+  nerPipeline: null,
   testTensors: [],
   monitor: null,
 };
@@ -260,6 +261,7 @@ const ui = {
       'tensor-output': ['Click "Run Tests" to test tensor operations...', ''],
       'text-output': ['Load model first, then classify text...', ''],
       'feature-output': ['Enter text and extract features...', ''],
+      'ner-output': ['Enter text and run NER...', ''],
       'quant-output': ['Test in-browser quantization...', ''],
       'debugger-output': ['Inspect tensor values and statistics...', ''],
       'benchmark-output': ['Benchmark tensor operations...', ''],
@@ -467,6 +469,62 @@ const features = {
       outputs.forEach(t => t.dispose());
     } catch (e) {
       ui.showError('feature-output', e);
+    }
+  },
+
+  /**
+   * NER demo (token-classification pipeline)
+   */
+  async loadNERModel() {
+    ui.showLoading('ner-output', 'Loading NER model...');
+
+    try {
+      // Let the pipeline handle downloading model/tokenizer/config.
+      state.nerPipeline = await edgeFlow.pipeline('token-classification', {
+        model: 'default',
+        runtime: 'wasm',
+      });
+
+      ui.showSuccess('ner-output', 'NER model ready');
+    } catch (e) {
+      state.nerPipeline = null;
+      ui.showError('ner-output', e);
+    }
+  },
+
+  async runNER() {
+    const text = ui.$('ner-input')?.value;
+    if (!text) return;
+
+    if (!state.nerPipeline) {
+      ui.setOutput('ner-output', 'Load NER model first', 'warn');
+      return;
+    }
+
+    ui.showLoading('ner-output', 'Running NER...');
+
+    try {
+      const ner = state.nerPipeline;
+
+      const start = performance.now();
+      const entities = await ner.run(text, { threshold: 0.5 });
+      const time = (performance.now() - start).toFixed(1);
+
+      if (!entities.length) {
+        ui.$('ner-output').innerHTML = `<pre><span class="warn">No entities found</span>\nTime: ${time}ms</pre>`;
+        return;
+      }
+
+      const lines = [
+        `<span class="success">✓ Found ${entities.length} entities</span>`,
+        `Time: ${time}ms`,
+        '',
+        ...entities.map((e, i) => `${i + 1}. [${e.entity}] "${e.word}" (${(e.score * 100).toFixed(1)}%) @${e.start}:${e.end}`),
+      ];
+
+      ui.$('ner-output').innerHTML = `<pre>${lines.join('\n')}</pre>`;
+    } catch (e) {
+      ui.showError('ner-output', e);
     }
   },
 
@@ -768,6 +826,8 @@ window.Demo = {
   classifyText: () => features.classifyText(),
   classifyBatch: () => features.classifyBatch(),
   extractFeatures: () => features.extractFeatures(),
+  loadNERModel: () => features.loadNERModel(),
+  runNER: () => features.runNER(),
 
   // Tools
   quantize: () => features.quantize(),

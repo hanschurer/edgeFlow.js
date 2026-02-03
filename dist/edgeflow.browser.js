@@ -4052,6 +4052,18 @@ var Tokenizer = class _Tokenizer {
       tokenizer.unkToken = data.model.unk_token ?? "[UNK]";
       tokenizer.continuingSubwordPrefix = data.model.continuing_subword_prefix ?? "##";
     }
+    const inferFromVocab = (tok) => tokenizer.vocab.get(tok);
+    const padFromVocab = inferFromVocab("[PAD]");
+    if (padFromVocab !== void 0)
+      tokenizer.padTokenId = padFromVocab;
+    const unkFromVocab = inferFromVocab("[UNK]");
+    if (unkFromVocab !== void 0)
+      tokenizer.unkTokenId = unkFromVocab;
+    tokenizer.clsTokenId ?? (tokenizer.clsTokenId = inferFromVocab("[CLS]"));
+    tokenizer.sepTokenId ?? (tokenizer.sepTokenId = inferFromVocab("[SEP]"));
+    tokenizer.maskTokenId ?? (tokenizer.maskTokenId = inferFromVocab("[MASK]"));
+    tokenizer.bosTokenId ?? (tokenizer.bosTokenId = inferFromVocab("<s>"));
+    tokenizer.eosTokenId ?? (tokenizer.eosTokenId = inferFromVocab("</s>"));
     if (data.added_tokens) {
       for (const token of data.added_tokens) {
         tokenizer.addedTokens.set(token.content, token.id);
@@ -4125,6 +4137,11 @@ var Tokenizer = class _Tokenizer {
    * Pre-tokenize text (split into words)
    */
   preTokenize(text) {
+    if (this.modelType === "WordPiece") {
+      const pattern2 = /\p{L}+|\p{N}+|[^\s\p{L}\p{N}]+/gu;
+      const matches2 = text.match(pattern2);
+      return matches2 ?? [text];
+    }
     const pattern = /'s|'t|'re|'ve|'m|'ll|'d| ?\p{L}+| ?\p{N}+| ?[^\s\p{L}\p{N}]+|\s+(?!\S)|\s+/gu;
     const matches = text.match(pattern);
     return matches ?? [text];
@@ -4245,6 +4262,9 @@ var Tokenizer = class _Tokenizer {
    * Tokenize a single word
    */
   tokenizeWord(word) {
+    if (this.modelType === "WordPiece") {
+      word = word.trimStart();
+    }
     if (this.addedTokens.has(word)) {
       return [word];
     }
@@ -5771,6 +5791,474 @@ var TextGenerationPipeline = class extends BasePipeline {
   }
 };
 
+// dist/pipelines/token-classification.js
+init_tensor();
+
+// dist/utils/hub.js
+init_model_loader();
+init_types();
+var DEFAULT_ENDPOINT = "https://huggingface.co";
+var DEFAULT_REVISION = "main";
+var ONNX_MODEL_FILES = [
+  "model.onnx",
+  "model_quantized.onnx",
+  "model_int8.onnx",
+  "model_uint8.onnx",
+  "model_fp16.onnx",
+  "onnx/model.onnx",
+  "onnx/model_quantized.onnx"
+];
+function buildFileUrl(modelId, filename, options = {}) {
+  const endpoint = options.endpoint ?? DEFAULT_ENDPOINT;
+  const revision = options.revision ?? DEFAULT_REVISION;
+  const subfolder = options.subfolder ? `${options.subfolder}/` : "";
+  return `${endpoint}/${modelId}/resolve/${revision}/${subfolder}${filename}`;
+}
+async function fetchWithAuth(url, token) {
+  const headers = {};
+  if (token) {
+    headers["Authorization"] = `Bearer ${token}`;
+  }
+  const response = await fetch(url, { headers });
+  return response;
+}
+async function fileExists(modelId, filename, options = {}) {
+  const url = buildFileUrl(modelId, filename, options);
+  try {
+    const response = await fetchWithAuth(url, options.token);
+    return response.ok || response.status === 302;
+  } catch {
+    return false;
+  }
+}
+async function findOnnxModel(modelId, options = {}) {
+  for (const filename of ONNX_MODEL_FILES) {
+    if (await fileExists(modelId, filename, options)) {
+      return filename;
+    }
+  }
+  return null;
+}
+async function downloadFile(modelId, filename, options = {}) {
+  const url = buildFileUrl(modelId, filename, options);
+  return loadModelData(url, {
+    cache: options.cache ?? true,
+    forceDownload: options.forceDownload ?? false,
+    onProgress: options.onProgress ? (progress) => {
+      options.onProgress({
+        file: filename,
+        fileIndex: 1,
+        totalFiles: 1,
+        fileProgress: progress,
+        overallProgress: progress.percent
+      });
+    } : void 0
+  });
+}
+async function downloadJson(modelId, filename, options = {}) {
+  const url = buildFileUrl(modelId, filename, options);
+  if (options.cache !== false && !options.forceDownload) {
+    const cached = await isModelCached(url);
+    if (cached) {
+      const data = await loadModelData(url, { cache: true });
+      const text = new TextDecoder().decode(data);
+      return JSON.parse(text);
+    }
+  }
+  const response = await fetchWithAuth(url, options.token);
+  if (!response.ok) {
+    throw new EdgeFlowError(`Failed to download ${filename} from ${modelId}: ${response.status}`, ErrorCodes.MODEL_NOT_FOUND);
+  }
+  return response.json();
+}
+async function downloadTokenizer(modelId, options = {}) {
+  const url = buildFileUrl(modelId, "tokenizer.json", options);
+  const data = await loadModelData(url, {
+    cache: options.cache ?? true,
+    forceDownload: options.forceDownload ?? false,
+    onProgress: options.onProgress ? (progress) => {
+      options.onProgress({
+        file: "tokenizer.json",
+        fileIndex: 1,
+        totalFiles: 1,
+        fileProgress: progress,
+        overallProgress: progress.percent
+      });
+    } : void 0
+  });
+  const text = new TextDecoder().decode(data);
+  return Tokenizer.fromJSON(text);
+}
+async function downloadConfig(modelId, options = {}) {
+  return downloadJson(modelId, "config.json", options);
+}
+async function downloadModel(modelId, options = {}) {
+  const files = {};
+  const totalSteps = 3;
+  let currentStep = 0;
+  const reportProgress = (file, progress) => {
+    if (options.onProgress) {
+      const baseProgress = currentStep / totalSteps * 100;
+      const stepProgress = progress.percent / totalSteps;
+      options.onProgress({
+        file,
+        fileIndex: currentStep + 1,
+        totalFiles: totalSteps,
+        fileProgress: progress,
+        overallProgress: baseProgress + stepProgress
+      });
+    }
+  };
+  console.log(`\u{1F50D} Finding ONNX model in ${modelId}...`);
+  const modelFile = await findOnnxModel(modelId, options);
+  if (!modelFile) {
+    throw new EdgeFlowError(`No ONNX model found in ${modelId}. Please ensure the model has an ONNX file.`, ErrorCodes.MODEL_NOT_FOUND, { modelId, triedFiles: ONNX_MODEL_FILES });
+  }
+  files.model = modelFile;
+  console.log(`\u{1F4E6} Downloading model: ${modelFile}`);
+  const modelData = await downloadFile(modelId, modelFile, {
+    ...options,
+    onProgress: (p) => reportProgress(modelFile, p.fileProgress)
+  });
+  currentStep = 1;
+  let tokenizer;
+  try {
+    console.log(`\u{1F4DD} Downloading tokenizer...`);
+    files.tokenizer = "tokenizer.json";
+    tokenizer = await downloadTokenizer(modelId, options);
+    console.log(`\u2713 Tokenizer loaded`);
+  } catch (error) {
+    console.warn(`\u26A0\uFE0F No tokenizer found for ${modelId}`);
+  }
+  currentStep = 2;
+  let config;
+  try {
+    console.log(`\u2699\uFE0F Downloading config...`);
+    files.config = "config.json";
+    config = await downloadConfig(modelId, options);
+    console.log(`\u2713 Config loaded`);
+  } catch (error) {
+    console.warn(`\u26A0\uFE0F No config found for ${modelId}`);
+  }
+  currentStep = 3;
+  if (options.onProgress) {
+    options.onProgress({
+      file: "complete",
+      fileIndex: totalSteps,
+      totalFiles: totalSteps,
+      fileProgress: { loaded: 1, total: 1, percent: 100, speed: 0, eta: 0 },
+      overallProgress: 100
+    });
+  }
+  console.log(`\u2705 Model bundle downloaded: ${modelId}`);
+  return {
+    modelId,
+    modelData,
+    tokenizer,
+    config,
+    files
+  };
+}
+async function fromHub(modelId, options = {}) {
+  return downloadModel(modelId, options);
+}
+async function modelExists(modelId, options = {}) {
+  try {
+    const modelFile = await findOnnxModel(modelId, options);
+    return modelFile !== null;
+  } catch {
+    return false;
+  }
+}
+async function getModelInfo(modelId, options = {}) {
+  const [onnxFile, hasTokenizer, config] = await Promise.all([
+    findOnnxModel(modelId, options),
+    fileExists(modelId, "tokenizer.json", options),
+    downloadConfig(modelId, options).catch(() => void 0)
+  ]);
+  return {
+    hasOnnx: onnxFile !== null,
+    onnxFile: onnxFile ?? void 0,
+    hasTokenizer,
+    hasConfig: config !== void 0,
+    config
+  };
+}
+var POPULAR_MODELS = {
+  // Text Classification / Sentiment
+  "sentiment-analysis": "Xenova/distilbert-base-uncased-finetuned-sst-2-english",
+  "text-classification": "Xenova/distilbert-base-uncased-finetuned-sst-2-english",
+  // Feature Extraction
+  "feature-extraction": "Xenova/all-MiniLM-L6-v2",
+  "sentence-similarity": "Xenova/all-MiniLM-L6-v2",
+  // Question Answering
+  "question-answering": "Xenova/distilbert-base-cased-distilled-squad",
+  // Token Classification
+  "ner": "Xenova/bert-base-NER",
+  "token-classification": "Xenova/bert-base-NER",
+  // Text Generation
+  "text-generation": "Xenova/gpt2",
+  // Translation
+  "translation-en-fr": "Xenova/t5-small",
+  "translation-en-de": "Xenova/t5-small",
+  // Summarization
+  "summarization": "Xenova/distilbart-cnn-6-6",
+  // Fill Mask
+  "fill-mask": "Xenova/bert-base-uncased",
+  // Image Classification
+  "image-classification": "Xenova/vit-base-patch16-224",
+  // Object Detection
+  "object-detection": "Xenova/detr-resnet-50",
+  // Image Segmentation
+  "image-segmentation": "Xenova/segformer-b0-finetuned-ade-512-512",
+  // Zero-shot Classification
+  "zero-shot-classification": "Xenova/mobilebert-uncased-mnli",
+  // Speech Recognition
+  "automatic-speech-recognition": "Xenova/whisper-tiny.en",
+  // Text-to-Speech
+  "text-to-speech": "Xenova/speecht5_tts"
+};
+function getDefaultModel(task) {
+  return POPULAR_MODELS[task];
+}
+async function fromTask(task, options = {}) {
+  const modelId = getDefaultModel(task);
+  return downloadModel(modelId, options);
+}
+
+// dist/pipelines/token-classification.js
+var TokenClassificationPipeline = class _TokenClassificationPipeline extends BasePipeline {
+  constructor(config) {
+    super(config);
+    __publicField(this, "tokenizer", null);
+    __publicField(this, "id2label", []);
+    __publicField(this, "injectedModel", null);
+  }
+  /**
+   * Create pipeline from a pre-loaded model instance.
+   * This lets apps reuse models loaded via edgeFlow.loadModel(url).
+   */
+  static fromLoadedModel(loadedModel, tokenizer, id2label, config = { runtime: loadedModel.runtime, cache: true }) {
+    const p = new _TokenClassificationPipeline({
+      task: "token-classification",
+      model: "injected",
+      runtime: config.runtime,
+      cache: config.cache ?? true,
+      quantization: config.quantization
+    });
+    p.injectedModel = loadedModel;
+    p.model = loadedModel;
+    p.tokenizer = tokenizer;
+    p.id2label = id2label;
+    p.isReady = true;
+    return p;
+  }
+  /**
+   * Initialize pipeline (download model/tokenizer/config and load runtime model).
+   */
+  async initialize() {
+    if (this.isReady && this.model && this.tokenizer)
+      return;
+    if (this.injectedModel && this.tokenizer) {
+      this.model = this.injectedModel;
+      this.isReady = true;
+      return;
+    }
+    const modelSpec = this.config.model;
+    const bundle = modelSpec === "default" ? await fromTask("token-classification", { cache: this.config.cache ?? true }) : await fromHub(modelSpec, { cache: this.config.cache ?? true });
+    this.tokenizer = bundle.tokenizer ?? await loadTokenizerFromHub(bundle.modelId);
+    const id2label = bundle.config?.id2label;
+    if (id2label && typeof id2label === "object") {
+      const pairs = Object.entries(id2label).map(([k, v]) => [Number(k), String(v)]).filter(([k]) => Number.isFinite(k)).sort((a, b) => a[0] - b[0]);
+      this.id2label = pairs.map(([, v]) => v);
+    } else {
+      this.id2label = ["O", "B-PER", "I-PER", "B-ORG", "I-ORG", "B-LOC", "I-LOC", "B-MISC", "I-MISC"];
+    }
+    const runtime = this.config.runtime && this.config.runtime !== "auto" ? this.config.runtime : "wasm";
+    this.model = await loadModelFromBuffer(bundle.modelData, {
+      runtime,
+      quantization: this.config.quantization,
+      cache: this.config.cache,
+      metadata: { name: bundle.modelId }
+    });
+    this.isReady = true;
+  }
+  async run(input, options) {
+    await this.initialize();
+    const threshold = options?.threshold ?? 0.5;
+    const allowed = options?.entityTypes ? new Set(options.entityTypes) : null;
+    const maxLength = options?.maxLength ?? 128;
+    const encoded = this.tokenizer.encode(input, {
+      maxLength,
+      padding: "max_length",
+      truncation: true,
+      returnTokenTypeIds: true
+    });
+    const inputIds = new EdgeFlowTensor(encoded.inputIds, [1, encoded.inputIds.length], "int64");
+    const attentionMask = new EdgeFlowTensor(encoded.attentionMask, [1, encoded.attentionMask.length], "int64");
+    const tokenTypeIds = new EdgeFlowTensor(encoded.tokenTypeIds ?? new Array(encoded.inputIds.length).fill(0), [1, encoded.inputIds.length], "int64");
+    const outputs = await runInference(this.model, [inputIds, attentionMask, tokenTypeIds]);
+    const entities = this.postprocessTokenClassification(outputs, input, encoded.inputIds);
+    inputIds.dispose();
+    attentionMask.dispose();
+    tokenTypeIds.dispose();
+    outputs.forEach((t) => t.dispose());
+    return entities.filter((e) => e.score >= threshold).filter((e) => allowed ? allowed.has(e.entity) : true);
+  }
+  // BasePipeline abstract methods (not used because we override run)
+  async preprocess() {
+    throw new Error("TokenClassificationPipeline.preprocess is not used");
+  }
+  async postprocess() {
+    throw new Error("TokenClassificationPipeline.postprocess is not used");
+  }
+  /**
+   * Convert logits -> BIO tags -> merged spans
+   */
+  postprocessTokenClassification(outputs, text, inputIds) {
+    const logits = outputs[0];
+    if (!logits)
+      return [];
+    const shape = logits.shape;
+    const seqLen = shape[1] ?? inputIds.length;
+    const numLabels = shape[2] ?? this.id2label.length;
+    const data = logits.toFloat32Array();
+    const offsets = this.alignOffsets(text, inputIds, seqLen);
+    const toks = [];
+    for (let i = 0; i < seqLen; i++) {
+      const tokenStr = this.tokenizer.getToken(inputIds[i] ?? -1) ?? "";
+      const off = offsets[i];
+      if (!off)
+        continue;
+      const [start, end] = off;
+      const base = i * numLabels;
+      let maxIdx = 0;
+      let maxLogit = data[base] ?? -Infinity;
+      for (let j = 1; j < numLabels; j++) {
+        const v = data[base + j] ?? -Infinity;
+        if (v > maxLogit) {
+          maxLogit = v;
+          maxIdx = j;
+        }
+      }
+      let sumExp = 0;
+      for (let j = 0; j < numLabels; j++) {
+        sumExp += Math.exp((data[base + j] ?? -Infinity) - maxLogit);
+      }
+      const prob = sumExp > 0 ? 1 / sumExp : 0;
+      const label = this.id2label[maxIdx] ?? "O";
+      toks.push({ token: tokenStr, label, prob, start, end });
+    }
+    const alignedToks = toks.filter((t) => t.start !== t.end);
+    return mergeBioToEntities(alignedToks, text);
+  }
+  /**
+   * Approximate token->char offset alignment for WordPiece-style tokenizers.
+   * This is "good enough" for demo highlighting, and works well for BERT NER.
+   */
+  alignOffsets(text, inputIds, seqLen) {
+    const offsets = Array.from({ length: seqLen }, () => [0, 0]);
+    let cursor = 0;
+    for (let i = 0; i < Math.min(seqLen, inputIds.length); i++) {
+      const id = inputIds[i];
+      const tok = this.tokenizer.getToken(id) ?? "";
+      if (!tok || this.tokenizer.isSpecialToken(tok) || tok === "[PAD]" || tok.startsWith("[") && tok.endsWith("]")) {
+        offsets[i] = [0, 0];
+        continue;
+      }
+      let piece = tok.startsWith("##") ? tok.slice(2) : tok;
+      piece = piece.replace(/^[\s\u0120\u2581]+/g, "");
+      if (!piece) {
+        offsets[i] = [0, 0];
+        continue;
+      }
+      let pos = text.indexOf(piece, cursor);
+      if (pos === -1)
+        pos = text.toLowerCase().indexOf(piece.toLowerCase(), cursor);
+      if (pos === -1) {
+        const nextNonSpace = text.slice(cursor).search(/\S/);
+        if (nextNonSpace >= 0) {
+          const from = cursor + nextNonSpace;
+          pos = text.indexOf(piece, from);
+          if (pos === -1)
+            pos = text.toLowerCase().indexOf(piece.toLowerCase(), from);
+        }
+      }
+      if (pos === -1) {
+        offsets[i] = [0, 0];
+        continue;
+      }
+      offsets[i] = [pos, pos + piece.length];
+      cursor = pos + piece.length;
+    }
+    return offsets;
+  }
+};
+function mergeBioToEntities(toks, text) {
+  const entities = [];
+  let curType = null;
+  let curStart = 0;
+  let curEnd = 0;
+  let curProbSum = 0;
+  let curCount = 0;
+  const flush = () => {
+    if (!curType || curStart === curEnd)
+      return;
+    const word = text.slice(curStart, curEnd);
+    entities.push({
+      entity: curType,
+      word,
+      start: curStart,
+      end: curEnd,
+      score: curCount ? curProbSum / curCount : 0
+    });
+    curType = null;
+    curStart = 0;
+    curEnd = 0;
+    curProbSum = 0;
+    curCount = 0;
+  };
+  const toEntityType = (t) => {
+    if (t === "PER" || t === "ORG" || t === "LOC" || t === "MISC")
+      return t;
+    return null;
+  };
+  for (const tok of toks) {
+    const label = tok.label;
+    if (!label || label === "O") {
+      flush();
+      continue;
+    }
+    const m = /^(B|I)-(.+)$/.exec(label);
+    if (!m) {
+      flush();
+      continue;
+    }
+    const prefix = m[1];
+    const type = toEntityType(m[2]);
+    if (!type) {
+      flush();
+      continue;
+    }
+    const startsNew = prefix === "B" || curType === null || curType !== type || tok.start > curEnd + 1;
+    if (startsNew) {
+      flush();
+      curType = type;
+      curStart = tok.start;
+      curEnd = tok.end;
+      curProbSum = tok.prob;
+      curCount = 1;
+    } else {
+      curEnd = Math.max(curEnd, tok.end);
+      curProbSum += tok.prob;
+      curCount += 1;
+    }
+  }
+  flush();
+  return entities;
+}
+registerPipeline("token-classification", (config) => new TokenClassificationPipeline(config));
+
 // dist/pipelines/object-detection.js
 init_tensor();
 var COCO_LABELS = [
@@ -6440,6 +6928,9 @@ async function pipeline(task, options) {
     case "text-classification":
       pipelineInstance = new TextClassificationPipeline(config, options?.labels);
       break;
+    case "token-classification":
+      pipelineInstance = new TokenClassificationPipeline(config);
+      break;
     case "sentiment-analysis":
       pipelineInstance = new SentimentAnalysisPipeline(config);
       break;
@@ -6482,224 +6973,6 @@ async function createPipelines(tasks, options) {
 
 // dist/utils/index.js
 init_model_loader();
-
-// dist/utils/hub.js
-init_model_loader();
-init_types();
-var DEFAULT_ENDPOINT = "https://huggingface.co";
-var DEFAULT_REVISION = "main";
-var ONNX_MODEL_FILES = [
-  "model.onnx",
-  "model_quantized.onnx",
-  "model_int8.onnx",
-  "model_uint8.onnx",
-  "model_fp16.onnx",
-  "onnx/model.onnx",
-  "onnx/model_quantized.onnx"
-];
-function buildFileUrl(modelId, filename, options = {}) {
-  const endpoint = options.endpoint ?? DEFAULT_ENDPOINT;
-  const revision = options.revision ?? DEFAULT_REVISION;
-  const subfolder = options.subfolder ? `${options.subfolder}/` : "";
-  return `${endpoint}/${modelId}/resolve/${revision}/${subfolder}${filename}`;
-}
-async function fetchWithAuth(url, token) {
-  const headers = {};
-  if (token) {
-    headers["Authorization"] = `Bearer ${token}`;
-  }
-  const response = await fetch(url, { headers });
-  return response;
-}
-async function fileExists(modelId, filename, options = {}) {
-  const url = buildFileUrl(modelId, filename, options);
-  try {
-    const response = await fetchWithAuth(url, options.token);
-    return response.ok || response.status === 302;
-  } catch {
-    return false;
-  }
-}
-async function findOnnxModel(modelId, options = {}) {
-  for (const filename of ONNX_MODEL_FILES) {
-    if (await fileExists(modelId, filename, options)) {
-      return filename;
-    }
-  }
-  return null;
-}
-async function downloadFile(modelId, filename, options = {}) {
-  const url = buildFileUrl(modelId, filename, options);
-  return loadModelData(url, {
-    cache: options.cache ?? true,
-    forceDownload: options.forceDownload ?? false,
-    onProgress: options.onProgress ? (progress) => {
-      options.onProgress({
-        file: filename,
-        fileIndex: 1,
-        totalFiles: 1,
-        fileProgress: progress,
-        overallProgress: progress.percent
-      });
-    } : void 0
-  });
-}
-async function downloadJson(modelId, filename, options = {}) {
-  const url = buildFileUrl(modelId, filename, options);
-  if (options.cache !== false && !options.forceDownload) {
-    const cached = await isModelCached(url);
-    if (cached) {
-      const data = await loadModelData(url, { cache: true });
-      const text = new TextDecoder().decode(data);
-      return JSON.parse(text);
-    }
-  }
-  const response = await fetchWithAuth(url, options.token);
-  if (!response.ok) {
-    throw new EdgeFlowError(`Failed to download ${filename} from ${modelId}: ${response.status}`, ErrorCodes.MODEL_NOT_FOUND);
-  }
-  return response.json();
-}
-async function downloadTokenizer(modelId, options = {}) {
-  const url = buildFileUrl(modelId, "tokenizer.json", options);
-  return Tokenizer.fromUrl(url);
-}
-async function downloadConfig(modelId, options = {}) {
-  return downloadJson(modelId, "config.json", options);
-}
-async function downloadModel(modelId, options = {}) {
-  const files = {};
-  const totalSteps = 3;
-  let currentStep = 0;
-  const reportProgress = (file, progress) => {
-    if (options.onProgress) {
-      const baseProgress = currentStep / totalSteps * 100;
-      const stepProgress = progress.percent / totalSteps;
-      options.onProgress({
-        file,
-        fileIndex: currentStep + 1,
-        totalFiles: totalSteps,
-        fileProgress: progress,
-        overallProgress: baseProgress + stepProgress
-      });
-    }
-  };
-  console.log(`\u{1F50D} Finding ONNX model in ${modelId}...`);
-  const modelFile = await findOnnxModel(modelId, options);
-  if (!modelFile) {
-    throw new EdgeFlowError(`No ONNX model found in ${modelId}. Please ensure the model has an ONNX file.`, ErrorCodes.MODEL_NOT_FOUND, { modelId, triedFiles: ONNX_MODEL_FILES });
-  }
-  files.model = modelFile;
-  console.log(`\u{1F4E6} Downloading model: ${modelFile}`);
-  const modelData = await downloadFile(modelId, modelFile, {
-    ...options,
-    onProgress: (p) => reportProgress(modelFile, p.fileProgress)
-  });
-  currentStep = 1;
-  let tokenizer;
-  try {
-    console.log(`\u{1F4DD} Downloading tokenizer...`);
-    files.tokenizer = "tokenizer.json";
-    tokenizer = await downloadTokenizer(modelId, options);
-    console.log(`\u2713 Tokenizer loaded`);
-  } catch (error) {
-    console.warn(`\u26A0\uFE0F No tokenizer found for ${modelId}`);
-  }
-  currentStep = 2;
-  let config;
-  try {
-    console.log(`\u2699\uFE0F Downloading config...`);
-    files.config = "config.json";
-    config = await downloadConfig(modelId, options);
-    console.log(`\u2713 Config loaded`);
-  } catch (error) {
-    console.warn(`\u26A0\uFE0F No config found for ${modelId}`);
-  }
-  currentStep = 3;
-  if (options.onProgress) {
-    options.onProgress({
-      file: "complete",
-      fileIndex: totalSteps,
-      totalFiles: totalSteps,
-      fileProgress: { loaded: 1, total: 1, percent: 100, speed: 0, eta: 0 },
-      overallProgress: 100
-    });
-  }
-  console.log(`\u2705 Model bundle downloaded: ${modelId}`);
-  return {
-    modelId,
-    modelData,
-    tokenizer,
-    config,
-    files
-  };
-}
-async function fromHub(modelId, options = {}) {
-  return downloadModel(modelId, options);
-}
-async function modelExists(modelId, options = {}) {
-  try {
-    const modelFile = await findOnnxModel(modelId, options);
-    return modelFile !== null;
-  } catch {
-    return false;
-  }
-}
-async function getModelInfo(modelId, options = {}) {
-  const [onnxFile, hasTokenizer, config] = await Promise.all([
-    findOnnxModel(modelId, options),
-    fileExists(modelId, "tokenizer.json", options),
-    downloadConfig(modelId, options).catch(() => void 0)
-  ]);
-  return {
-    hasOnnx: onnxFile !== null,
-    onnxFile: onnxFile ?? void 0,
-    hasTokenizer,
-    hasConfig: config !== void 0,
-    config
-  };
-}
-var POPULAR_MODELS = {
-  // Text Classification / Sentiment
-  "sentiment-analysis": "Xenova/distilbert-base-uncased-finetuned-sst-2-english",
-  "text-classification": "Xenova/distilbert-base-uncased-finetuned-sst-2-english",
-  // Feature Extraction
-  "feature-extraction": "Xenova/all-MiniLM-L6-v2",
-  "sentence-similarity": "Xenova/all-MiniLM-L6-v2",
-  // Question Answering
-  "question-answering": "Xenova/distilbert-base-cased-distilled-squad",
-  // Token Classification
-  "ner": "Xenova/bert-base-NER",
-  "token-classification": "Xenova/bert-base-NER",
-  // Text Generation
-  "text-generation": "Xenova/gpt2",
-  // Translation
-  "translation-en-fr": "Xenova/t5-small",
-  "translation-en-de": "Xenova/t5-small",
-  // Summarization
-  "summarization": "Xenova/distilbart-cnn-6-6",
-  // Fill Mask
-  "fill-mask": "Xenova/bert-base-uncased",
-  // Image Classification
-  "image-classification": "Xenova/vit-base-patch16-224",
-  // Object Detection
-  "object-detection": "Xenova/detr-resnet-50",
-  // Image Segmentation
-  "image-segmentation": "Xenova/segformer-b0-finetuned-ade-512-512",
-  // Zero-shot Classification
-  "zero-shot-classification": "Xenova/mobilebert-uncased-mnli",
-  // Speech Recognition
-  "automatic-speech-recognition": "Xenova/whisper-tiny.en",
-  // Text-to-Speech
-  "text-to-speech": "Xenova/speecht5_tts"
-};
-function getDefaultModel(task) {
-  return POPULAR_MODELS[task];
-}
-async function fromTask(task, options = {}) {
-  const modelId = getDefaultModel(task);
-  return downloadModel(modelId, options);
-}
 
 // dist/tools/benchmark.js
 async function benchmark(fn, options = {}) {

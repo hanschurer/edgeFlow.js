@@ -59,6 +59,17 @@ export interface ObjectDetectionResult extends PipelineResult {
   box: { x: number; y: number; width: number; height: number };
 }
 
+/**
+ * Token classification (NER) span result
+ */
+export interface TokenClassificationResult extends PipelineResult {
+  entity: string;
+  score: number;
+  start: number;
+  end: number;
+  word: string;
+}
+
 // ============================================================================
 // Base Pipeline Class
 // ============================================================================

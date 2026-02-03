@@ -19,6 +19,7 @@ export {
   IMAGENET_LABELS,
   type PipelineResult,
   type TextClassificationResult,
+  type TokenClassificationResult,
   type FeatureExtractionResult,
   type ImageClassificationResult,
   type ObjectDetectionResult,
@@ -56,6 +57,14 @@ export {
   type TextGenerationResult,
   type GenerationStreamEvent,
 } from './text-generation.js';
+
+// Token Classification (NER)
+export {
+  TokenClassificationPipeline,
+  type TokenClassificationOptions,
+  type NerEntity,
+  type NerEntityType,
+} from './token-classification.js';
 
 // Object Detection
 export {
@@ -119,6 +128,7 @@ export interface PipelineFactoryOptions {
  */
 type PipelineTaskMap = {
   'text-classification': TextClassificationPipeline;
+  'token-classification': TokenClassificationPipeline;
   'sentiment-analysis': SentimentAnalysisPipeline;
   'feature-extraction': FeatureExtractionPipeline;
   'image-classification': ImageClassificationPipeline;
@@ -131,6 +141,7 @@ type PipelineTaskMap = {
 
 // Import pipeline classes
 import { TextClassificationPipeline, SentimentAnalysisPipeline } from './text-classification.js';
+import { TokenClassificationPipeline } from './token-classification.js';
 import { FeatureExtractionPipeline } from './feature-extraction.js';
 import { ImageClassificationPipeline } from './image-classification.js';
 import { TextGenerationPipeline } from './text-generation.js';
@@ -166,13 +177,16 @@ export async function pipeline<T extends keyof PipelineTaskMap>(
     quantization: options?.quantization,
   };
 
-  type AllPipelines = TextClassificationPipeline | SentimentAnalysisPipeline | FeatureExtractionPipeline | ImageClassificationPipeline | TextGenerationPipeline | ObjectDetectionPipeline | AutomaticSpeechRecognitionPipeline | ZeroShotClassificationPipeline | QuestionAnsweringPipeline;
+  type AllPipelines = TextClassificationPipeline | TokenClassificationPipeline | SentimentAnalysisPipeline | FeatureExtractionPipeline | ImageClassificationPipeline | TextGenerationPipeline | ObjectDetectionPipeline | AutomaticSpeechRecognitionPipeline | ZeroShotClassificationPipeline | QuestionAnsweringPipeline;
   
   let pipelineInstance: AllPipelines;
 
   switch (task) {
     case 'text-classification':
       pipelineInstance = new TextClassificationPipeline(config, options?.labels);
+      break;
+    case 'token-classification':
+      pipelineInstance = new TokenClassificationPipeline(config);
       break;
     case 'sentiment-analysis':
       pipelineInstance = new SentimentAnalysisPipeline(config);
