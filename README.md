@@ -71,6 +71,7 @@ Open **http://localhost:3000** in your browser:
    - 🧮 **Tensor Operations** - Test tensor creation, math ops, softmax, relu
    - 📝 **Text Classification** - Run sentiment analysis on text
    - 🔍 **Feature Extraction** - Extract embeddings from text
+   - 🏷️ **Named Entity Recognition** - Extract entities (PER, ORG, LOC, MISC) from text
    - ⚡ **Task Scheduling** - Test priority-based scheduling
    - 📋 **Task Scheduler** - Test priority-based task scheduling
    - 💾 **Memory Management** - Test allocation and cleanup
@@ -193,6 +194,26 @@ const result = await qa.run({
 console.log(result.answer); // 'Paris'
 ```
 
+### Named Entity Recognition (NER)
+
+```typescript
+import { pipeline } from 'edgeflowjs';
+
+const ner = await pipeline('token-classification');
+
+const entities = await ner.run('Barack Obama visited Beijing and met researchers at OpenAI Labs.', {
+  threshold: 0.5,
+  entityTypes: ['PER', 'ORG', 'LOC'] // Optional: filter by entity types
+});
+
+console.log(entities);
+// [
+//   { entity: 'PER', word: 'Barack Obama', score: 0.98, start: 0, end: 12 },
+//   { entity: 'LOC', word: 'Beijing', score: 0.95, start: 21, end: 28 },
+//   { entity: 'ORG', word: 'OpenAI Labs', score: 0.92, start: 48, end: 60 }
+// ]
+```
+
 ### Load from HuggingFace Hub
 
 ```typescript
@@ -236,6 +257,7 @@ pool.terminate();
 | Feature Extraction | `feature-extraction` | ✅ |
 | Image Classification | `image-classification` | ✅ |
 | Text Generation | `text-generation` | ✅ |
+| Named Entity Recognition | `token-classification` | ✅ |
 | Object Detection | `object-detection` | ✅ |
 | Speech Recognition | `automatic-speech-recognition` | ✅ |
 | Zero-shot Classification | `zero-shot-classification` | ✅ |
@@ -519,6 +541,7 @@ c.dispose();
 - `FeatureExtractionPipeline` - Text embeddings
 - `ImageClassificationPipeline` - Image classification
 - `TextGenerationPipeline` - Text generation with streaming
+- `TokenClassificationPipeline` - Named Entity Recognition (NER)
 - `ObjectDetectionPipeline` - Object detection with bounding boxes
 - `AutomaticSpeechRecognitionPipeline` - Speech to text
 - `ZeroShotClassificationPipeline` - Classify without training

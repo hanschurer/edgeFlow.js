@@ -71,6 +71,7 @@ npm run demo
    - 🧮 **张量运算** - 测试张量创建、数学运算、softmax、relu
    - 📝 **文本分类** - 对文本进行情感分析
    - 🔍 **特征提取** - 从文本中提取嵌入向量
+   - 🏷️ **命名实体识别** - 从文本中提取实体（PER、ORG、LOC、MISC）
    - ⚡ **任务调度** - 测试优先级调度
    - 📋 **任务调度** - 测试基于优先级的任务调度
    - 💾 **内存管理** - 测试内存分配和清理
@@ -193,6 +194,26 @@ const result = await qa.run({
 console.log(result.answer); // '巴黎'
 ```
 
+### 命名实体识别（NER）
+
+```typescript
+import { pipeline } from 'edgeflowjs';
+
+const ner = await pipeline('token-classification');
+
+const entities = await ner.run('奥巴马访问了北京，并在 OpenAI 实验室会见了研究人员。', {
+  threshold: 0.5,
+  entityTypes: ['PER', 'ORG', 'LOC'] // 可选：按实体类型过滤
+});
+
+console.log(entities);
+// [
+//   { entity: 'PER', word: '奥巴马', score: 0.98, start: 0, end: 3 },
+//   { entity: 'LOC', word: '北京', score: 0.95, start: 5, end: 7 },
+//   { entity: 'ORG', word: 'OpenAI 实验室', score: 0.92, start: 10, end: 22 }
+// ]
+```
+
 ### 从 HuggingFace Hub 加载
 
 ```typescript
@@ -236,6 +257,7 @@ pool.terminate();
 | 特征提取 | `feature-extraction` | ✅ |
 | 图像分类 | `image-classification` | ✅ |
 | 文本生成 | `text-generation` | ✅ |
+| 命名实体识别 | `token-classification` | ✅ |
 | 目标检测 | `object-detection` | ✅ |
 | 语音识别 | `automatic-speech-recognition` | ✅ |
 | 零样本分类 | `zero-shot-classification` | ✅ |
@@ -519,6 +541,7 @@ c.dispose();
 - `FeatureExtractionPipeline` - 文本嵌入
 - `ImageClassificationPipeline` - 图像分类
 - `TextGenerationPipeline` - 文本生成（支持流式输出）
+- `TokenClassificationPipeline` - 命名实体识别（NER）
 - `ObjectDetectionPipeline` - 目标检测（带边界框）
 - `AutomaticSpeechRecognitionPipeline` - 语音转文字
 - `ZeroShotClassificationPipeline` - 零样本分类
